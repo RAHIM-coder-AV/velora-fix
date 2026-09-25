@@ -1,0 +1,143 @@
+import type { Locale } from "@/i18n/config";
+
+export type Localized = Record<Locale, string>;
+
+export type UserRole = "customer" | "admin";
+
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "processing"
+  | "shipped"
+  | "delivered"
+  | "cancelled";
+
+export type PaymentMethod = "cod";
+
+export interface Category {
+  id: string;
+  slug: string;
+  name: Localized;
+  description: Localized;
+  image: string;
+}
+
+export interface ProductImage {
+  id: string;
+  url: string;
+  alt: Localized;
+}
+
+export interface ProductVariant {
+  id: string;
+  sku: string;
+  size: string;
+  color: Localized;
+  colorHex: string;
+  stock: number;
+  price?: number;
+}
+
+export interface ProductOffer {
+  id: string;
+  title: Localized;
+  quantity: number;
+  price: number;
+  originalPrice?: number;
+  badge?: Localized;
+}
+
+export interface Review {
+  id: string;
+  productId: string;
+  author: string;
+  rating: number;
+  comment: Localized;
+  createdAt: string;
+}
+
+export interface Product {
+  id: string;
+  slug: string;
+  sku?: string;
+  name: Localized;
+  description: Localized;
+  categoryId: string;
+  price: number;
+  compareAtPrice?: number;
+  images: ProductImage[];
+  variants: ProductVariant[];
+  sizes: string[];
+  colors: { name: Localized; hex: string }[];
+  offers?: ProductOffer[];
+  active?: boolean;
+  views?: number;
+  featured: boolean;
+  isNew: boolean;
+  rating: number;
+  reviewCount: number;
+  createdAt: string;
+}
+
+export interface CartItem {
+  productId: string;
+  variantId: string;
+  quantity: number;
+}
+
+export interface WishlistItem {
+  productId: string;
+}
+
+export interface Profile {
+  id: string;
+  email: string;
+  fullName: string;
+  phone?: string;
+  address?: string;
+  wilaya?: string;
+  role: UserRole;
+  createdAt: string;
+}
+
+export interface OrderItem {
+  id: string;
+  productId: string;
+  variantId: string;
+  name: Localized;
+  size: string;
+  color: Localized;
+  image: string;
+  unitPrice: number;
+  quantity: number;
+  sku?: string;
+}
+
+export interface Order {
+  id: string;
+  reference: string;
+  userId?: string;
+  email?: string;
+  customerName: string;
+  phone: string;
+  wilaya: string;
+  commune: string;
+  address: string;
+  notes?: string;
+  status: OrderStatus;
+  paymentMethod: PaymentMethod;
+  subtotal: number;
+  shipping: number;
+  total: number;
+  items: OrderItem[];
+  offerTitle?: string;
+  createdAt: string;
+}
+
+export interface Filters {
+  category?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  q?: string;
+  sort?: "newest" | "price-asc" | "price-desc" | "rating";
+}

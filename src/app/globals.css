@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  --cream: #f6f1ea;
+  --cream-2: #efe8dc;
+  --ink: #141414;
+  --muted: #6f675f;
+  --sand: #9a8463;
+  --line: #e4ddd3;
+  --white: #fffcf8;
+}
+
+@theme inline {
+  --color-cream: var(--cream);
+  --color-cream-2: var(--cream-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-sand: var(--sand);
+  --color-line: var(--line);
+  --color-white: var(--white);
+  --font-sans: var(--font-outfit);
+  --font-serif: var(--font-cormorant);
+  --font-arabic: var(--font-cairo);
+}
+
+html,
+body {
+  background: var(--cream);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-outfit), system-ui, sans-serif;
+}
+
+html[lang="ar"] body,
+html[dir="rtl"] body {
+  font-family: var(--font-cairo), var(--font-outfit), system-ui, sans-serif;
+}
+
+.font-serif {
+  font-family: var(--font-cormorant), Georgia, serif;
+}
+
+html[lang="ar"] .font-serif {
+  font-family: var(--font-cairo), serif;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--cream);
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  text-underline-offset: 4px;
+}
