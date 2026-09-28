@@ -23,6 +23,7 @@ import { formatPrice } from "@/lib/utils";
 import { totalStock } from "@/lib/catalog/queries";
 import { AdminOrdersTable } from "@/components/admin/admin-orders-table";
 import { AdminProductsTable } from "@/components/admin/admin-products-table";
+import { AdminSettingsView } from "@/components/admin/admin-settings-view";
 import { cn } from "@/lib/utils";
 
 type AdminTab = "stats" | "orders" | "products" | "settings";
@@ -352,6 +353,8 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {activeTab === "settings" && <AdminSettingsView />}
       </main>
     </div>
   );

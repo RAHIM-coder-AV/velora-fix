@@ -2,12 +2,13 @@
 
 import { useState, useMemo, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { User, Phone, MapPin, Home, CheckCircle2, Truck, ShieldCheck, Tag } from "lucide-react";
+import { User, Phone, MapPin, Home, CheckCircle2, Truck, ShieldCheck, Tag, Building2 } from "lucide-react";
 import type { Product, ProductOffer, Order } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
 import { ALGERIA_WILAYAS, getCommunesForWilaya } from "@/lib/algeria-data";
 import { formatPrice, isAlgerianPhone, orderReference, uid } from "@/lib/utils";
 import { useCatalogStore } from "@/stores/catalog-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
@@ -81,8 +82,12 @@ export function QuickOrderForm({
   const [wilaya, setWilaya] = useState(ALGERIA_WILAYAS[15]?.nameAr || "16 - الجزائر");
   const [commune, setCommune] = useState("");
   const [address, setAddress] = useState("");
+  const [deliveryType, setDeliveryType] = useState<"home" | "desk">("home");
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const getShippingFee = useSettingsStore((s) => s.getShippingFee);
+  const shippingFee = useMemo(() => getShippingFee(wilaya, deliveryType), [getShippingFee, wilaya, deliveryType]);
 
   // Dynamic communes list based on selected wilaya
   const communes = useMemo(() => getCommunesForWilaya(wilaya), [wilaya]);
@@ -124,7 +129,6 @@ export function QuickOrderForm({
         ) || product.variants[0];
 
       const ref = orderReference();
-      const shippingFee = 500; // تكلفة التوصيل التقريبية
       const qty = selectedOffer ? selectedOffer.quantity : 1;
 
       const newOrder: Order = {
@@ -134,7 +138,7 @@ export function QuickOrderForm({
         phone: phone.trim(),
         wilaya: wilaya,
         commune: commune.trim(),
-        address: address.trim() || "توصيل للعنوان",
+        address: (address.trim() || "توصيل للعنوان") + (deliveryType === "desk" ? " (استلام من المكتب)" : " (توصيل للمنزل)"),
         status: "pending",
         paymentMethod: "cod",
         subtotal: currentPrice,
@@ -320,16 +324,68 @@ export function QuickOrderForm({
             </div>
           </div>
 
+          {/* Delivery Type Option (Home vs Stop Desk) */}
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+              {locale === "ar" ? "طريقة التوصيل:" : "Mode de livraison :"}
+            </label>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeliveryType("home")}
+                className={cn(
+                  "flex items-center justify-between rounded-xl border-2 p-2.5 text-xs font-bold transition",
+                  deliveryType === "home"
+                    ? "border-emerald-600 bg-emerald-50 text-emerald-900 dark:border-emerald-500 dark:bg-emerald-950/40 dark:text-emerald-200"
+                    : "border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                )}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Home size={14} className="text-emerald-600" />
+                  {locale === "ar" ? "إلى باب المنزل" : "À domicile"}
+                </span>
+                <span className="text-[11px] font-extrabold text-emerald-700 dark:text-emerald-400">
+                  {formatPrice(getShippingFee(wilaya, "home"), locale)}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDeliveryType("desk")}
+                className={cn(
+                  "flex items-center justify-between rounded-xl border-2 p-2.5 text-xs font-bold transition",
+                  deliveryType === "desk"
+                    ? "border-emerald-600 bg-emerald-50 text-emerald-900 dark:border-emerald-500 dark:bg-emerald-950/40 dark:text-emerald-200"
+                    : "border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                )}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Building2 size={14} className="text-purple-600" />
+                  {locale === "ar" ? "استلام من المكتب" : "Stop Desk"}
+                </span>
+                <span className="text-[11px] font-extrabold text-purple-700 dark:text-purple-400">
+                  {formatPrice(getShippingFee(wilaya, "desk"), locale)}
+                </span>
+              </button>
+            </div>
+          </div>
+
           {/* Address */}
           <div>
             <label className="mb-1 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
-              {locale === "ar" ? "العنوان أو الحي (اختياري)" : "Adresse de livraison (optionnel)"}
+              {deliveryType === "home"
+                ? (locale === "ar" ? "العنوان أو الحي بالتفصيل" : "Adresse de livraison (Rue, Quartier)")
+                : (locale === "ar" ? "اسم أو موقع مكتب الاستلام المفضل" : "Bureau Stop Desk préféré")}
             </label>
             <input
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder={locale === "ar" ? "الحي، الشارع، أو نقطة استلام" : "Rue, quartier, etc."}
+              placeholder={
+                deliveryType === "home"
+                  ? (locale === "ar" ? "الحي، الشارع، أو علامة مميزة" : "Rue, quartier, etc.")
+                  : (locale === "ar" ? "مثال: مكتب ياليدين أو برو كوليس في وسط المدينة" : "Ex: Bureau Yalidine centre-ville")
+              }
               className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3.5 py-2.5 text-sm transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>

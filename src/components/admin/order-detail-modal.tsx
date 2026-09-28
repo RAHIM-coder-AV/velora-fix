@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { X, Phone, MapPin, Printer, User, Calendar, CheckCircle2, AlertCircle, Truck, Package, MessageSquare } from "lucide-react";
 import type { Order, OrderStatus } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
 import { formatPrice } from "@/lib/utils";
+import { useSettingsStore } from "@/stores/settings-store";
+import { toast } from "@/components/ui/toast";
 
 interface OrderDetailModalProps {
   order: Order | null;
@@ -20,6 +23,56 @@ export function OrderDetailModal({
   onStatusChange,
 }: OrderDetailModalProps) {
   const { locale, dict } = useLocale();
+  const ecotrack = useSettingsStore((s) => s.settings.ecotrack);
+  const [isSendingEcoTrack, setIsSendingEcoTrack] = useState(false);
+
+  async function handleSendToEcoTrack() {
+    if (!order) return;
+    if (!ecotrack.token) {
+      toast(locale === "ar" ? "يرجى إدخال رمز API Token لـ EcoTrack في الإعدادات أولاً!" : "Veuillez configurer le Token EcoTrack dans les paramètres !");
+      return;
+    }
+
+    setIsSendingEcoTrack(true);
+    try {
+      const res = await fetch("/api/ecotrack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: ecotrack.token,
+          baseUrl: ecotrack.baseUrl,
+          order: {
+            reference: order.reference,
+            customerName: order.customerName,
+            phone: order.phone,
+            wilaya: order.wilaya,
+            commune: order.commune,
+            address: order.address,
+            total: order.total,
+            shipping: order.shipping,
+            isStopdesk: false,
+            items: order.items.map((i) => ({
+              name: i.name.fr || i.name.ar,
+              quantity: i.quantity,
+              price: i.unitPrice,
+            })),
+          },
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast(locale === "ar" ? `تم إرسال الطلب لـ EcoTrack بنجاح! كود التتبع: ${data.trackingCode}` : `Commande envoyée avec succès ! Tracking: ${data.trackingCode}`);
+        onStatusChange("shipped");
+      } else {
+        toast(locale === "ar" ? `خطأ EcoTrack: ${data.error}` : `Erreur EcoTrack : ${data.error}`);
+      }
+    } catch {
+      toast(locale === "ar" ? "فشل الاتصال بخادم EcoTrack" : "Erreur de connexion avec EcoTrack");
+    } finally {
+      setIsSendingEcoTrack(false);
+    }
+  }
 
   if (!isOpen || !order) return null;
 
@@ -65,6 +118,19 @@ export function OrderDetailModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSendToEcoTrack}
+              disabled={isSendingEcoTrack}
+              className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+            >
+              <Truck size={15} />
+              <span>
+                {isSendingEcoTrack
+                  ? (locale === "ar" ? "جاري الإرسال..." : "Envoi...")
+                  : (locale === "ar" ? "إرسال لـ EcoTrack" : "Envoyer à EcoTrack")}
+              </span>
+            </button>
             <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300"

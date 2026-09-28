@@ -9,6 +9,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/configured";
 import { placeOrder as placeOrderDb } from "@/lib/supabase/data";
 import { useCartStore } from "@/stores/cart-store";
 import { useCatalogStore } from "@/stores/catalog-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLocale } from "@/providers/locale-provider";
 import { cartTotals } from "@/components/cart/cart-view";
@@ -58,8 +59,16 @@ export function CheckoutForm() {
     [items, products],
   );
 
+  const getShippingFee = useSettingsStore((s) => s.getShippingFee);
+  const freeThreshold = useSettingsStore((s) => s.settings.freeShippingThreshold);
+
   const subtotal = lines.reduce((s, l) => s + l.product.price * l.item.quantity, 0);
-  const totals = cartTotals(subtotal);
+  const shippingFee = subtotal >= freeThreshold || subtotal === 0 ? 0 : getShippingFee(form.wilaya, "home");
+  const totals = {
+    subtotal,
+    shipping: shippingFee,
+    total: subtotal + shippingFee,
+  };
 
   function validate() {
     const e: Record<string, string> = {};

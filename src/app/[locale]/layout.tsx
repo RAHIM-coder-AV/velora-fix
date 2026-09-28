@@ -10,6 +10,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { ToastHost } from "@/components/ui/toast";
+import { AnalyticsScripts } from "@/components/analytics/analytics-scripts";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -73,6 +74,7 @@ export default async function LocaleLayout({
           <Footer />
           <MobileBottomNav />
           <ToastHost />
+          <AnalyticsScripts />
         </LocaleProvider>
       </body>
     </html>
