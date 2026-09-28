@@ -198,6 +198,19 @@ export default function AdminPage() {
               <LayoutDashboard size={15} />
               <span>{locale === "ar" ? "الإحصائيات" : "Tableau de bord"}</span>
             </button>
+
+            <button
+              onClick={() => setActiveTab("settings")}
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-4 py-2 font-bold transition",
+                activeTab === "settings"
+                  ? "bg-purple-600 text-white shadow-sm"
+                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              )}
+            >
+              <Settings size={15} />
+              <span>{locale === "ar" ? "الإعدادات والربط" : "Paramètres & Intégrations"}</span>
+            </button>
           </nav>
         </div>
       </header>
