@@ -121,15 +121,24 @@ export function QuickOrderForm({
     setSubmitting(true);
 
     try {
-      const activeVariant =
-        product.variants.find(
-          (v) =>
-            v.size === selectedSize &&
-            (!selectedColorHex || v.colorHex.toLowerCase() === selectedColorHex.toLowerCase())
-        ) || product.variants[0];
+      const qty = selectedOffer ? selectedOffer.quantity : 1;
+      const activeVariant = product.variants.find(
+        (variant) =>
+          variant.size === selectedSize &&
+          (!selectedColorHex ||
+            variant.colorHex.toLowerCase() === selectedColorHex.toLowerCase()),
+      );
+      if (!activeVariant || activeVariant.stock < qty) {
+        toast(
+          locale === "ar"
+            ? "الكمية المطلوبة غير متوفرة لهذا المقاس واللون."
+            : "Cette combinaison taille/couleur n'est pas disponible en quantité suffisante.",
+        );
+        setSubmitting(false);
+        return;
+      }
 
       const ref = orderReference();
-      const qty = selectedOffer ? selectedOffer.quantity : 1;
 
       const newOrder: Order = {
         id: uid("ord"),
@@ -179,7 +188,7 @@ export function QuickOrderForm({
   }
 
   return (
-    <div className="rounded-xl border-2 border-emerald-500/30 bg-white p-5 shadow-xl md:p-7 dark:bg-zinc-900">
+    <div className="product-order-form rounded-xl border-2 border-emerald-500/30 bg-white p-5 shadow-xl md:p-7 dark:bg-zinc-900">
       {/* Top Banner Notice */}
       <div className="mb-5 flex items-center justify-between rounded-lg bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
         <span className="flex items-center gap-1.5">
@@ -217,8 +226,8 @@ export function QuickOrderForm({
                   }}
                   placeholder={locale === "ar" ? "الاسم واللقب" : "Nom et prénom"}
                   className={cn(
-                    "w-full rounded-lg border bg-zinc-50 px-3.5 py-2.5 text-sm transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-zinc-800 dark:text-zinc-100",
-                    errors.name ? "border-red-500 ring-1 ring-red-500" : "border-zinc-300 dark:border-zinc-700"
+                    "w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-300 dark:bg-white dark:text-zinc-900 dark:placeholder:text-zinc-400",
+                    errors.name ? "border-red-500 ring-1 ring-red-500" : "border-zinc-300 dark:border-zinc-300"
                   )}
                 />
               </div>
@@ -242,8 +251,8 @@ export function QuickOrderForm({
                   placeholder={locale === "ar" ? "05 / 06 / 07 ..." : "0550 00 00 00"}
                   dir="ltr"
                   className={cn(
-                    "w-full rounded-lg border bg-zinc-50 px-3.5 py-2.5 text-sm transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-zinc-800 dark:text-zinc-100 text-right",
-                    errors.phone ? "border-red-500 ring-1 ring-red-500" : "border-zinc-300 dark:border-zinc-700"
+                    "w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-right dark:border-zinc-300 dark:bg-white dark:text-zinc-900 dark:placeholder:text-zinc-400",
+                    errors.phone ? "border-red-500 ring-1 ring-red-500" : "border-zinc-300 dark:border-zinc-300"
                   )}
                 />
               </div>
@@ -265,12 +274,12 @@ export function QuickOrderForm({
                   if (errors.wilaya) setErrors({ ...errors, wilaya: "" });
                 }}
                 className={cn(
-                  "w-full rounded-lg border bg-zinc-50 px-3.5 py-2.5 text-sm transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-zinc-800 dark:text-zinc-100",
-                  errors.wilaya ? "border-red-500" : "border-zinc-300 dark:border-zinc-700"
+                  "public-select w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-zinc-900 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-300 dark:bg-white dark:text-zinc-900",
+                  errors.wilaya ? "border-red-500" : "border-zinc-300 dark:border-zinc-300"
                 )}
               >
                 {ALGERIA_WILAYAS.map((w) => (
-                  <option key={w.code} value={locale === "ar" ? w.nameAr : w.nameFr}>
+                  <option key={w.code} value={locale === "ar" ? w.nameAr : w.nameFr} className="bg-white text-zinc-900">
                     {locale === "ar" ? w.nameAr : w.nameFr}
                   </option>
                 ))}
@@ -292,13 +301,13 @@ export function QuickOrderForm({
                       if (errors.commune) setErrors({ ...errors, commune: "" });
                     }}
                     className={cn(
-                      "w-full rounded-lg border bg-zinc-50 px-3 py-2.5 text-sm transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-zinc-800 dark:text-zinc-100",
-                      errors.commune ? "border-red-500" : "border-zinc-300 dark:border-zinc-700"
+                      "public-select w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-zinc-900 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-300 dark:bg-white dark:text-zinc-900",
+                      errors.commune ? "border-red-500" : "border-zinc-300 dark:border-zinc-300"
                     )}
                   >
-                    <option value="">{locale === "ar" ? "اختر البلدية..." : "Choisir la commune..."}</option>
+                    <option value="" className="bg-white text-zinc-900">{locale === "ar" ? "اختر البلدية..." : "Choisir la commune..."}</option>
                     {communes.map((c) => (
-                      <option key={c} value={c}>
+                      <option key={c} value={c} className="bg-white text-zinc-900">
                         {c}
                       </option>
                     ))}
@@ -315,8 +324,8 @@ export function QuickOrderForm({
                   }}
                   placeholder={locale === "ar" ? "اكتب البلدية" : "Entrez votre commune"}
                   className={cn(
-                    "w-full rounded-lg border bg-zinc-50 px-3.5 py-2.5 text-sm transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-zinc-800 dark:text-zinc-100",
-                    errors.commune ? "border-red-500" : "border-zinc-300 dark:border-zinc-700"
+                    "w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-300 dark:bg-white dark:text-zinc-900 dark:placeholder:text-zinc-400",
+                    errors.commune ? "border-red-500" : "border-zinc-300 dark:border-zinc-300"
                   )}
                 />
               )}
@@ -386,7 +395,7 @@ export function QuickOrderForm({
                   ? (locale === "ar" ? "الحي، الشارع، أو علامة مميزة" : "Rue, quartier, etc.")
                   : (locale === "ar" ? "مثال: مكتب ياليدين أو برو كوليس في وسط المدينة" : "Ex: Bureau Yalidine centre-ville")
               }
-              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3.5 py-2.5 text-sm transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              className="w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-300 dark:bg-white dark:text-zinc-900 dark:placeholder:text-zinc-400"
             />
           </div>
         </div>

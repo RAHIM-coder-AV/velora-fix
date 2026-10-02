@@ -55,6 +55,28 @@ input,
 select,
 textarea {
   font: inherit;
+  color: #111827;
+}
+
+select {
+  color-scheme: light;
+}
+
+select option {
+  background-color: #ffffff;
+  color: #111827;
+}
+
+select.public-select {
+  color-scheme: light !important;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+select.public-select option {
+  color-scheme: light !important;
+  background-color: #ffffff !important;
+  color: #111827 !important;
 }
 
 a {

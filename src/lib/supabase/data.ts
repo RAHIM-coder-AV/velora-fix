@@ -360,21 +360,48 @@ export async function upsertProduct(
     if (e) throw e;
   }
 
-  await sb.from("product_variants").delete().eq("product_id", productId);
-  if (p.variants.length) {
-    const { error: e } = await sb.from("product_variants").insert(
-      p.variants.map((v, i) => ({
-        product_id: productId,
-        sku: UUID_RE.test(v.id) ? v.sku : `${v.sku}-${i}-${Date.now().toString(36)}`.slice(0, 32),
-        size: v.size,
-        color_fr: v.color.fr,
-        color_ar: v.color.ar,
-        color_hex: v.colorHex,
-        stock: v.stock,
-        price: v.price ?? null,
-      })),
-    );
-    if (e) throw e;
+  const { data: currentVariants, error: variantsError } = await sb
+    .from("product_variants")
+    .select("id")
+    .eq("product_id", productId);
+  if (variantsError) throw variantsError;
+
+  const currentVariantIds = new Set(
+    ((currentVariants ?? []) as Array<{ id: string }>).map((variant) => variant.id),
+  );
+  const retainedVariantIds = new Set(
+    p.variants
+      .filter((variant) => currentVariantIds.has(variant.id))
+      .map((variant) => variant.id),
+  );
+  const removedVariantIds = [...currentVariantIds].filter((id) => !retainedVariantIds.has(id));
+  if (removedVariantIds.length) {
+    const { error } = await sb.from("product_variants").delete().in("id", removedVariantIds);
+    if (error) throw error;
+  }
+
+  const variantRows = p.variants.map((variant, index) => ({
+    ...(retainedVariantIds.has(variant.id) ? { id: variant.id } : {}),
+    product_id: productId,
+    sku: retainedVariantIds.has(variant.id)
+      ? variant.sku
+      : `${variant.sku}-${index}-${Date.now().toString(36)}`.slice(0, 32),
+    size: variant.size,
+    color_fr: variant.color.fr,
+    color_ar: variant.color.ar,
+    color_hex: variant.colorHex,
+    stock: variant.stock,
+    price: variant.price ?? null,
+  }));
+  const existingRows = variantRows.filter((row) => "id" in row);
+  const newRows = variantRows.filter((row) => !("id" in row));
+  if (existingRows.length) {
+    const { error } = await sb.from("product_variants").upsert(existingRows, { onConflict: "id" });
+    if (error) throw error;
+  }
+  if (newRows.length) {
+    const { error } = await sb.from("product_variants").insert(newRows);
+    if (error) throw error;
   }
 
   return productId;

@@ -184,11 +184,11 @@ export function CheckoutForm() {
               setForm({ ...form, wilaya: e.target.value, commune: "" });
             }}
           >
-            <option value="">—</option>
+            <option value="" className="bg-white text-zinc-900">—</option>
             {ALGERIA_WILAYAS.map((w) => {
               const label = locale === "ar" ? w.nameAr : w.nameFr;
               return (
-                <option key={w.code} value={label}>
+                <option key={w.code} value={label} className="bg-white text-zinc-900">
                   {label}
                 </option>
               );
@@ -201,9 +201,9 @@ export function CheckoutForm() {
               value={form.commune}
               onChange={(e) => setForm({ ...form, commune: e.target.value })}
             >
-              <option value="">— {locale === "ar" ? "اختر البلدية" : "Choisir la commune"} —</option>
+              <option value="" className="bg-white text-zinc-900">— {locale === "ar" ? "اختر البلدية" : "Choisir la commune"} —</option>
               {getCommunesForWilaya(form.wilaya).map((c) => (
-                <option key={c} value={c}>
+                <option key={c} value={c} className="bg-white text-zinc-900">
                   {c}
                 </option>
               ))}

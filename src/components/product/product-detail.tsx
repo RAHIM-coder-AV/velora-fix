@@ -116,24 +116,24 @@ export function ProductDetail({
           <div className="space-y-2">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h1 className="font-serif text-3xl font-bold tracking-tight text-zinc-900 md:text-4xl dark:text-zinc-100">
+                <h1 className="font-serif text-3xl font-bold tracking-tight text-zinc-900 md:text-4xl">
                   {product.name[locale] || product.name.ar}
                 </h1>
                 <div className="mt-2 flex items-center gap-3">
                   <div className="flex items-center gap-1.5">
                     <RatingStars value={product.rating} />
-                    <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    <span className="text-xs font-semibold text-zinc-600">
                       ({product.rating.toFixed(1)})
                     </span>
                   </div>
                   <span className="text-xs text-zinc-400">·</span>
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  <span className="text-xs text-zinc-600">
                     {product.reviewCount} {locale === "ar" ? "تقييم" : "avis"}
                   </span>
                   {product.sku && (
                     <>
                       <span className="text-xs text-zinc-400">·</span>
-                      <span className="text-xs text-zinc-400">SKU: {product.sku}</span>
+                      <span className="text-xs text-zinc-600">SKU: {product.sku}</span>
                     </>
                   )}
                 </div>
@@ -143,7 +143,7 @@ export function ProductDetail({
               <button
                 type="button"
                 onClick={() => toggleWish(product.id)}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 transition hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 transition hover:bg-zinc-100"
                 aria-label="Wishlist"
               >
                 <Heart
@@ -183,7 +183,7 @@ export function ProductDetail({
             <button
               type="button"
               onClick={add}
-              className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 underline underline-offset-4 hover:text-emerald-600 dark:text-zinc-300"
+              className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 underline underline-offset-4 hover:text-emerald-600"
             >
               <ShoppingBag size={14} />
               {dict.product.addToCart}

@@ -20,7 +20,7 @@ export function Field({
 }
 
 const control =
-  "w-full border border-line bg-white px-3 py-3 text-sm outline-none transition-colors focus:border-ink";
+  "w-full border border-line bg-white px-3 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none transition-colors focus:border-ink";
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cn(control, className)} {...props} />;
@@ -31,5 +31,5 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
 }
 
 export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={cn(control, className)} {...props} />;
+  return <select className={cn(control, "public-select", className)} {...props} />;
 }

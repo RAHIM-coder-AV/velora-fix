@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { X, Plus, Trash2, Check, Upload, Tag, DollarSign, Image as ImageIcon, Layers } from "lucide-react";
+import { X, Plus, Trash2, Check, Upload, Tag, DollarSign, Image as ImageIcon, Layers, Palette } from "lucide-react";
 import type { Product, ProductOffer, Category } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
 import { uid } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { reconcileProductVariants } from "@/lib/catalog/product-options";
 
 interface ProductEditModalProps {
   product: Product;
@@ -24,11 +25,12 @@ export function ProductEditModal({
   onSave,
 }: ProductEditModalProps) {
   const { locale } = useLocale();
-  const [activeTab, setActiveTab] = useState<"general" | "offers" | "images">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "options" | "offers" | "images">("general");
 
   // Local form state
   const [formData, setFormData] = useState<Product>({
     ...product,
+    variants: reconcileProductVariants(product.variants, product.sizes, product.colors),
     offers: product.offers || [
       {
         id: uid("off"),
@@ -49,6 +51,93 @@ export function ProductEditModal({
   });
 
   const [newImageUrl, setNewImageUrl] = useState("");
+  const [newSize, setNewSize] = useState("");
+  const [newColor, setNewColor] = useState({ ar: "", fr: "", hex: "#111111" });
+  const [optionsError, setOptionsError] = useState("");
+
+  function updateProductOptions(sizes: string[], colors: Product["colors"]) {
+    setFormData((prev) => ({
+      ...prev,
+      sizes,
+      colors,
+      variants: reconcileProductVariants(prev.variants, sizes, colors),
+    }));
+  }
+
+  function handleAddSize() {
+    const size = newSize.trim();
+    if (!size) return;
+    if (formData.sizes.some((existing) => existing.toLowerCase() === size.toLowerCase())) {
+      setOptionsError(locale === "ar" ? "هذا المقاس موجود بالفعل." : "Cette taille existe déjà.");
+      return;
+    }
+    updateProductOptions([...formData.sizes, size], formData.colors);
+    setNewSize("");
+    setOptionsError("");
+  }
+
+  function handleAddColor() {
+    const ar = newColor.ar.trim();
+    const fr = newColor.fr.trim();
+    if (!ar || !fr) {
+      setOptionsError(locale === "ar" ? "أدخل اسم اللون بالعربية والفرنسية." : "Saisissez le nom dans les deux langues.");
+      return;
+    }
+    if (formData.colors.some((color) => color.hex.toLowerCase() === newColor.hex.toLowerCase())) {
+      setOptionsError(locale === "ar" ? "هذا اللون موجود بالفعل." : "Cette couleur existe déjà.");
+      return;
+    }
+    updateProductOptions(formData.sizes, [
+      ...formData.colors,
+      { name: { ar, fr }, hex: newColor.hex },
+    ]);
+    setNewColor({ ar: "", fr: "", hex: "#111111" });
+    setOptionsError("");
+  }
+
+  function handleColorChange(index: number, field: "ar" | "fr" | "hex", value: string) {
+    const updatedColors = [...formData.colors];
+    const previous = updatedColors[index];
+    const updatedColor =
+      field === "hex"
+        ? { ...previous, hex: value }
+        : { ...previous, name: { ...previous.name, [field]: value } };
+    if (
+      field === "hex" &&
+      updatedColors.some(
+        (color, colorIndex) =>
+          colorIndex !== index && color.hex.toLowerCase() === value.toLowerCase(),
+      )
+    ) {
+      setOptionsError(locale === "ar" ? "هذا اللون موجود بالفعل." : "Cette couleur existe déjà.");
+      return;
+    }
+    updatedColors[index] = updatedColor;
+    const variants = formData.variants.map((variant) =>
+      variant.colorHex.toLowerCase() === previous.hex.toLowerCase()
+        ? {
+            ...variant,
+            color: updatedColor.name,
+            colorHex: updatedColor.hex,
+          }
+        : variant,
+    );
+    setFormData((prev) => ({
+      ...prev,
+      colors: updatedColors,
+      variants: reconcileProductVariants(variants, prev.sizes, updatedColors),
+    }));
+    setOptionsError("");
+  }
+
+  function handleVariantStockChange(variantId: string, stock: number) {
+    setFormData((prev) => ({
+      ...prev,
+      variants: prev.variants.map((variant) =>
+        variant.id === variantId ? { ...variant, stock: Math.max(0, stock) } : variant,
+      ),
+    }));
+  }
 
   if (!isOpen) return null;
 
@@ -172,12 +261,12 @@ export function ProductEditModal({
         </div>
 
         {/* Tabs Bar */}
-        <div className="flex border-b border-zinc-200 px-6 dark:border-zinc-800">
+        <div className="flex flex-wrap border-b border-zinc-200 px-6 dark:border-zinc-800">
           <button
             type="button"
             onClick={() => setActiveTab("general")}
             className={cn(
-              "flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold uppercase tracking-wider transition",
+              "flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold uppercase tracking-wider transition",
               activeTab === "general"
                 ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
                 : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400"
@@ -191,7 +280,7 @@ export function ProductEditModal({
             type="button"
             onClick={() => setActiveTab("images")}
             className={cn(
-              "flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold uppercase tracking-wider transition",
+              "flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold uppercase tracking-wider transition",
               activeTab === "images"
                 ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
                 : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400"
@@ -205,7 +294,7 @@ export function ProductEditModal({
             type="button"
             onClick={() => setActiveTab("offers")}
             className={cn(
-              "flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold uppercase tracking-wider transition",
+              "flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold uppercase tracking-wider transition",
               activeTab === "offers"
                 ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
                 : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400"
@@ -213,6 +302,20 @@ export function ProductEditModal({
           >
             <Tag size={15} />
             {locale === "ar" ? "عروض الكمية (Packs)" : "Offres & Packs"} ({formData.offers?.length || 0})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("options")}
+            className={cn(
+              "flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold uppercase tracking-wider transition",
+              activeTab === "options"
+                ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
+                : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400"
+            )}
+          >
+            <Palette size={15} />
+            {locale === "ar" ? "الألوان والمقاسات" : "Couleurs & tailles"}
           </button>
         </div>
 
@@ -351,6 +454,183 @@ export function ProductEditModal({
                   }
                   className="w-full rounded-lg border border-zinc-300 bg-zinc-50 p-3 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-800"
                 />
+              </div>
+            </div>
+          )}
+
+          {activeTab === "options" && (
+            <div className="space-y-6">
+              <div>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold">{locale === "ar" ? "المقاسات المتاحة" : "Tailles disponibles"}</h3>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {locale === "ar" ? "تظهر المقاسات المضافة للزبون في صفحة المنتج." : "Les tailles seront proposées sur la fiche produit."}
+                    </p>
+                  </div>
+                  <span className="text-xs text-zinc-500">{formData.sizes.length}</span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={newSize}
+                    onChange={(event) => setNewSize(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleAddSize();
+                      }
+                    }}
+                    placeholder={locale === "ar" ? "مثال: XL أو 42" : "Ex. XL ou 42"}
+                    className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                  />
+                  <button type="button" onClick={handleAddSize} className="flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-700">
+                    <Plus size={14} /> {locale === "ar" ? "إضافة مقاس" : "Ajouter"}
+                  </button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {formData.sizes.map((size) => (
+                    <span key={size} className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-xs font-semibold dark:border-zinc-700 dark:bg-zinc-800">
+                      {size}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          updateProductOptions(formData.sizes.filter((item) => item !== size), formData.colors);
+                          setOptionsError("");
+                        }}
+                        aria-label={locale === "ar" ? `حذف المقاس ${size}` : `Supprimer la taille ${size}`}
+                        className="rounded p-0.5 text-zinc-400 hover:bg-rose-100 hover:text-rose-600"
+                      >
+                        <X size={13} />
+                      </button>
+                    </span>
+                  ))}
+                  {formData.sizes.length === 0 && <p className="text-xs text-zinc-400">{locale === "ar" ? "لم تتم إضافة مقاسات." : "Aucune taille."}</p>}
+                </div>
+              </div>
+
+              <div className="border-t border-zinc-200 pt-5 dark:border-zinc-800">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold">{locale === "ar" ? "الألوان المتاحة" : "Couleurs disponibles"}</h3>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {locale === "ar" ? "أدخل الاسم باللغتين وحدد لون العرض." : "Ajoutez le nom dans les deux langues et choisissez la couleur."}
+                    </p>
+                  </div>
+                  <span className="text-xs text-zinc-500">{formData.colors.length}</span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+                  <input
+                    value={newColor.ar}
+                    onChange={(event) => setNewColor((color) => ({ ...color, ar: event.target.value }))}
+                    placeholder={locale === "ar" ? "اسم اللون بالعربية" : "Nom arabe"}
+                    className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                  />
+                  <input
+                    value={newColor.fr}
+                    onChange={(event) => setNewColor((color) => ({ ...color, fr: event.target.value }))}
+                    placeholder={locale === "ar" ? "اسم اللون بالفرنسية" : "Nom français"}
+                    className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                  />
+                  <input
+                    type="color"
+                    value={newColor.hex}
+                    onChange={(event) => setNewColor((color) => ({ ...color, hex: event.target.value }))}
+                    aria-label={locale === "ar" ? "اختيار اللون" : "Choisir la couleur"}
+                    className="h-10 w-full cursor-pointer rounded-lg border border-zinc-300 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-800"
+                  />
+                  <button type="button" onClick={handleAddColor} className="flex items-center justify-center gap-1 rounded-lg bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-700">
+                    <Plus size={14} /> {locale === "ar" ? "إضافة لون" : "Ajouter"}
+                  </button>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {formData.colors.map((color, index) => (
+                    <div key={`${color.hex}-${index}`} className="grid items-center gap-2 rounded-lg border border-zinc-200 p-2 sm:grid-cols-[auto_1fr_1fr_auto_auto] dark:border-zinc-800">
+                      <span className="h-7 w-7 rounded-full border border-black/10" style={{ backgroundColor: color.hex }} />
+                      <input
+                        value={color.name.ar}
+                        onChange={(event) => handleColorChange(index, "ar", event.target.value)}
+                        aria-label={locale === "ar" ? "اسم اللون بالعربية" : "Nom arabe"}
+                        className="min-w-0 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                      />
+                      <input
+                        value={color.name.fr}
+                        onChange={(event) => handleColorChange(index, "fr", event.target.value)}
+                        aria-label={locale === "ar" ? "اسم اللون بالفرنسية" : "Nom français"}
+                        className="min-w-0 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                      />
+                      <input
+                        type="color"
+                        value={color.hex}
+                        onChange={(event) => handleColorChange(index, "hex", event.target.value)}
+                        aria-label={locale === "ar" ? "تعديل اللون" : "Modifier la couleur"}
+                        className="h-9 w-12 cursor-pointer rounded-md border border-zinc-300 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-800"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          updateProductOptions(formData.sizes, formData.colors.filter((_, i) => i !== index));
+                          setOptionsError("");
+                        }}
+                        aria-label={locale === "ar" ? `حذف اللون ${color.name.ar}` : `Supprimer ${color.name.fr}`}
+                        className="rounded-lg p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  {formData.colors.length === 0 && <p className="text-xs text-zinc-400">{locale === "ar" ? "لم تتم إضافة ألوان." : "Aucune couleur."}</p>}
+                </div>
+              </div>
+
+              {optionsError && <p role="alert" className="text-xs font-medium text-rose-600">{optionsError}</p>}
+
+              <div className="border-t border-zinc-200 pt-5 dark:border-zinc-800">
+                <div className="mb-3">
+                  <h3 className="text-sm font-bold">{locale === "ar" ? "مخزون كل مقاس ولون" : "Stock par taille et couleur"}</h3>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {locale === "ar" ? "تُحفظ تركيبات المقاس واللون كخيارات مستقلة. يبدأ المخزون لأي تركيبة جديدة من صفر." : "Chaque combinaison est enregistrée séparément. Le stock des nouvelles combinaisons commence à zéro."}
+                  </p>
+                </div>
+                {formData.variants.length > 0 ? (
+                  <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+                    <table className="w-full text-right text-xs">
+                      <thead className="bg-zinc-50 text-zinc-500 dark:bg-zinc-800">
+                        <tr>
+                          <th className="px-3 py-2">{locale === "ar" ? "المقاس" : "Taille"}</th>
+                          <th className="px-3 py-2">{locale === "ar" ? "اللون" : "Couleur"}</th>
+                          <th className="px-3 py-2">{locale === "ar" ? "المخزون" : "Stock"}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                        {formData.variants.map((variant) => (
+                          <tr key={variant.id}>
+                            <td className="px-3 py-2 font-semibold">{variant.size}</td>
+                            <td className="px-3 py-2">
+                              <span className="inline-flex items-center gap-2">
+                                <span className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: variant.colorHex }} />
+                                {variant.color[locale] || variant.color.ar}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={variant.stock}
+                                onChange={(event) => handleVariantStockChange(variant.id, Number(event.target.value) || 0)}
+                                aria-label={`${variant.size} ${variant.color.ar}`}
+                                className="w-24 rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-800"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                    {locale === "ar" ? "أضف مقاساً واحداً ولوناً واحداً على الأقل لإنشاء تركيبات المنتج." : "Ajoutez au moins une taille et une couleur pour créer les variantes."}
+                  </p>
+                )}
               </div>
             </div>
           )}
