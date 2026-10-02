@@ -28,18 +28,27 @@ export function AdminSettingsView() {
   const updateWilayaPrice = useSettingsStore((s) => s.updateWilayaPrice);
   const bulkUpdateWilayas = useSettingsStore((s) => s.bulkUpdateWilayas);
   const updateEcoTrack = useSettingsStore((s) => s.updateEcoTrack);
+  const updateNordEtOuest = useSettingsStore((s) => s.updateNordEtOuest);
   const updatePixels = useSettingsStore((s) => s.updatePixels);
 
-  const [activeSubTab, setActiveSubTab] = useState<"delivery" | "ecotrack" | "pixels">("delivery");
+  const [activeSubTab, setActiveSubTab] = useState<"delivery" | "ecotrack" | "nord_ouest" | "pixels">("delivery");
   const [searchQuery, setSearchQuery] = useState("");
   const [bulkHome, setBulkHome] = useState("");
   const [bulkDesk, setBulkDesk] = useState("");
 
   // EcoTrack Local State
-  const [ecotrackToken, setEcotrackToken] = useState(settings.ecotrack.token);
-  const [ecotrackUrl, setEcotrackUrl] = useState(settings.ecotrack.baseUrl);
-  const [ecotrackEnabled, setEcotrackEnabled] = useState(settings.ecotrack.enabled);
-  const [ecotrackAutoSend, setEcotrackAutoSend] = useState(settings.ecotrack.autoSendConfirmed);
+  const [ecotrackToken, setEcotrackToken] = useState(settings.ecotrack?.token || "");
+  const [ecotrackUrl, setEcotrackUrl] = useState(settings.ecotrack?.baseUrl || "https://api.ecotrack.dz/api/v1");
+  const [ecotrackEnabled, setEcotrackEnabled] = useState(settings.ecotrack?.enabled ?? true);
+  const [ecotrackAutoSend, setEcotrackAutoSend] = useState(settings.ecotrack?.autoSendConfirmed ?? false);
+  const [isTestingEcoTrack, setIsTestingEcoTrack] = useState(false);
+
+  // Nord Et Ouest Local State
+  const [nordToken, setNordToken] = useState(settings.nordEtOuest?.token || "");
+  const [nordUrl, setNordUrl] = useState(settings.nordEtOuest?.baseUrl || "https://api.nordetouest.com/api/v1");
+  const [nordEnabled, setNordEnabled] = useState(settings.nordEtOuest?.enabled ?? true);
+  const [nordAutoSend, setNordAutoSend] = useState(settings.nordEtOuest?.autoSendConfirmed ?? false);
+  const [isTestingNord, setIsTestingNord] = useState(false);
 
   // Pixels Local State
   const [fbPixel1, setFbPixel1] = useState(settings.pixels.facebookPixel1);
@@ -70,6 +79,94 @@ export function AdminSettingsView() {
       autoSendConfirmed: ecotrackAutoSend,
     });
     toast(locale === "ar" ? "تم حفظ إعدادات EcoTrack بنجاح!" : "Paramètres EcoTrack enregistrés !");
+  }
+
+  function handleSaveNordEtOuest() {
+    updateNordEtOuest({
+      token: nordToken.trim(),
+      baseUrl: nordUrl.trim(),
+      enabled: nordEnabled,
+      autoSendConfirmed: nordAutoSend,
+    });
+    toast(locale === "ar" ? "تم حفظ إعدادات Nord Et Ouest بنجاح!" : "Paramètres Nord Et Ouest enregistrés !");
+  }
+
+  async function handleTestEcoTrack() {
+    setIsTestingEcoTrack(true);
+    try {
+      const res = await fetch("/api/delivery/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company: "ecotrack",
+          token: ecotrackToken.trim(),
+          baseUrl: ecotrackUrl.trim(),
+          orders: [
+            {
+              id: "test",
+              reference: "TEST-01",
+              customerName: "عميل تجريبي",
+              phone: "0555000000",
+              wilaya: "16 - الجزائر",
+              commune: "الجزائر الوسطى",
+              address: "حي أول ماي",
+              total: 2500,
+              shipping: 400,
+              items: [{ name: "فحص الاتصال التجريبي", quantity: 1 }],
+            },
+          ],
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast(locale === "ar" ? "✅ الاتصال مع خادم EcoTrack يعمل بنجاح!" : "Connexion EcoTrack réussie !");
+      } else {
+        toast(locale === "ar" ? `تنبيه: ${data.error || "خطأ في الرد"}` : `Erreur: ${data.error}`);
+      }
+    } catch {
+      toast(locale === "ar" ? "فشل الاتصال بخادم EcoTrack" : "Échec de connexion");
+    } finally {
+      setIsTestingEcoTrack(false);
+    }
+  }
+
+  async function handleTestNord() {
+    setIsTestingNord(true);
+    try {
+      const res = await fetch("/api/delivery/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company: "nord_ouest",
+          token: nordToken.trim(),
+          baseUrl: nordUrl.trim(),
+          orders: [
+            {
+              id: "test",
+              reference: "TEST-02",
+              customerName: "عميل تجريبي",
+              phone: "0555000000",
+              wilaya: "31 - وهران",
+              commune: "وهران",
+              address: "السانية",
+              total: 3000,
+              shipping: 500,
+              items: [{ name: "فحص الاتصال التجريبي", quantity: 1 }],
+            },
+          ],
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast(locale === "ar" ? "✅ الاتصال مع خادم Nord Et Ouest يعمل بنجاح!" : "Connexion Nord Et Ouest réussie !");
+      } else {
+        toast(locale === "ar" ? `تنبيه: ${data.error || "خطأ في الرد"}` : `Erreur: ${data.error}`);
+      }
+    } catch {
+      toast(locale === "ar" ? "فشل الاتصال بخادم Nord Et Ouest" : "Échec de connexion");
+    } finally {
+      setIsTestingNord(false);
+    }
   }
 
   function handleSavePixels() {
@@ -103,12 +200,12 @@ export function AdminSettingsView() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-black text-zinc-900 dark:text-zinc-100">
-            {locale === "ar" ? "إعدادات المتجر والربط" : "Paramètres et Intégrations"}
+            {locale === "ar" ? "إعدادات المتجر وشركات التوصيل" : "Paramètres et Intégrations"}
           </h1>
           <p className="mt-1 text-xs text-zinc-500">
             {locale === "ar"
-              ? "إدارة أسعار التوصيل لـ 58 ولاية، ربط شركات التوصيل (EcoTrack)، والبيكسلات الإعلانية."
-              : "Tarifs de livraison, liaison EcoTrack et Pixels Meta & TikTok."}
+              ? "إدارة أسعار التوصيل لـ 58 ولاية، ربط شركات التوصيل (EcoTrack & Nord Et Ouest)، والبيكسلات الإعلانية."
+              : "Tarifs de livraison, intégrations EcoTrack & Nord Et Ouest, et Pixels."}
           </p>
         </div>
 
@@ -137,7 +234,20 @@ export function AdminSettingsView() {
             }`}
           >
             <Share2 size={14} className="text-emerald-600" />
-            <span>{locale === "ar" ? "ربط EcoTrack" : "EcoTrack"}</span>
+            <span>{locale === "ar" ? "شركة EcoTrack" : "EcoTrack"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("nord_ouest")}
+            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+              activeSubTab === "nord_ouest"
+                ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
+                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+            }`}
+          >
+            <Truck size={14} className="text-blue-600" />
+            <span>{locale === "ar" ? "شركة Nord Et Ouest" : "Nord Et Ouest"}</span>
           </button>
 
           <button
@@ -149,8 +259,8 @@ export function AdminSettingsView() {
                 : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
-            <Radio size={14} className="text-blue-600" />
-            <span>{locale === "ar" ? "بيكسل Meta & TikTok" : "Pixels"}</span>
+            <Radio size={14} className="text-purple-600" />
+            <span>{locale === "ar" ? "البيكسل الإعلاني" : "Pixels"}</span>
           </button>
         </div>
       </div>
@@ -386,20 +496,157 @@ export function AdminSettingsView() {
                 </div>
               </label>
 
-              <button
-                type="button"
-                onClick={handleSaveEcoTrack}
-                className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700 active:scale-95"
-              >
-                <Save size={15} />
-                <span>{locale === "ar" ? "حفظ إعدادات EcoTrack" : "Enregistrer EcoTrack"}</span>
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleTestEcoTrack}
+                  disabled={isTestingEcoTrack}
+                  className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+                >
+                  {isTestingEcoTrack ? (
+                    <span className="animate-spin">⏳</span>
+                  ) : (
+                    <CheckCircle2 size={14} />
+                  )}
+                  <span>{locale === "ar" ? "اختبار الاتصال" : "Tester la connexion"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEcoTrack}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700 active:scale-95"
+                >
+                  <Save size={15} />
+                  <span>{locale === "ar" ? "حفظ إعدادات EcoTrack" : "Enregistrer EcoTrack"}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* TAB 3: META & TIKTOK PIXELS */}
+      {/* TAB: NORD ET OUEST */}
+      {activeSubTab === "nord_ouest" && (
+        <div className="max-w-2xl space-y-6">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mb-5 flex items-center gap-3 border-b border-zinc-100 pb-4 dark:border-zinc-800">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40">
+                <Truck size={24} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  {locale === "ar" ? "ربط شركة التوصيل (Nord Et Ouest)" : "Intégration Nord Et Ouest"}
+                </h2>
+                <p className="text-xs text-zinc-500">
+                  {locale === "ar"
+                    ? "ربط المتجر بشركة Nord Et Ouest لإرسال الطلبات وتوليد بوليصات الشحن تلقائياً."
+                    : "Connectez votre boutique à Nord Et Ouest pour l'expédition automatique."}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Enable Nord Et Ouest Toggle */}
+              <div className="flex items-center justify-between rounded-xl bg-zinc-50 p-3.5 dark:bg-zinc-800/60">
+                <div>
+                  <p className="text-xs font-bold">{locale === "ar" ? "تفعيل الربط مع Nord Et Ouest" : "Activer Nord Et Ouest"}</p>
+                  <p className="text-[11px] text-zinc-400">
+                    {locale === "ar" ? "السماح بإرسال الطلبات إلى خوادم Nord Et Ouest" : "Permettre l'envoi des commandes"}
+                  </p>
+                </div>
+                <label className="relative inline-flex cursor-pointer items-center">
+                  <input
+                    type="checkbox"
+                    checked={nordEnabled}
+                    onChange={(e) => setNordEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="h-6 w-11 rounded-full bg-zinc-300 peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-focus:outline-none after:absolute after:top-[2px] after:start-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all" />
+                </label>
+              </div>
+
+              {/* API Token */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  {locale === "ar" ? "رمز الوصول الخاص بك (API Token) *" : "Jeton API (Token) *"}
+                </label>
+                <input
+                  type="password"
+                  value={nordToken}
+                  onChange={(e) => setNordToken(e.target.value)}
+                  placeholder="xxxxxxxxxxxxxxxxxxxxxxxxx"
+                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 font-mono text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+                />
+                <p className="mt-1 text-[10px] text-zinc-400">
+                  {locale === "ar"
+                    ? "يمكنك الحصول عليه من لوحة تحكم حسابك في Nord Et Ouest."
+                    : "Disponible dans votre tableau de bord Nord Et Ouest."}
+                </p>
+              </div>
+
+              {/* API Base URL */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  {locale === "ar" ? "رابط خادم Nord Et Ouest (Endpoint)" : "URL du serveur API"}
+                </label>
+                <input
+                  type="text"
+                  value={nordUrl}
+                  onChange={(e) => setNordUrl(e.target.value)}
+                  placeholder="https://api.nordetouest.com/api/v1"
+                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 font-mono text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+                />
+              </div>
+
+              {/* Auto send on confirm */}
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 p-3.5 dark:border-zinc-800">
+                <input
+                  type="checkbox"
+                  checked={nordAutoSend}
+                  onChange={(e) => setNordAutoSend(e.target.checked)}
+                  className="mt-0.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                    {locale === "ar" ? "إرسال تلقائي للطلب عند تحويله إلى 'مؤكد'" : "Envoi automatique après confirmation"}
+                  </p>
+                  <p className="text-[11px] text-zinc-500">
+                    {locale === "ar"
+                      ? "عند تغيير حالة الطلب إلى 'مؤكد'، يتم إرساله فوراً لشركة Nord Et Ouest."
+                      : "Dès que vous confirmez la commande, elle est expédiée sur Nord Et Ouest."}
+                  </p>
+                </div>
+              </label>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleTestNord}
+                  disabled={isTestingNord}
+                  className="flex items-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-4 py-2.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100 disabled:opacity-50 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"
+                >
+                  {isTestingNord ? (
+                    <span className="animate-spin">⏳</span>
+                  ) : (
+                    <CheckCircle2 size={14} />
+                  )}
+                  <span>{locale === "ar" ? "اختبار الاتصال" : "Tester la connexion"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveNordEtOuest}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-xs font-bold text-white transition hover:bg-blue-700 active:scale-95"
+                >
+                  <Save size={15} />
+                  <span>{locale === "ar" ? "حفظ إعدادات Nord Et Ouest" : "Enregistrer Nord Et Ouest"}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: META & TIKTOK PIXELS */}
+
       {activeSubTab === "pixels" && (
         <div className="max-w-2xl space-y-6">
           <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">

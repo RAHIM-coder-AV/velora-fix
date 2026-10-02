@@ -11,6 +11,7 @@ interface SettingsState {
   updateWilayaPrice: (code: string, updates: Partial<WilayaDeliveryPrice>) => void;
   bulkUpdateWilayas: (updates: { homePrice?: number; deskPrice?: number; enabled?: boolean }) => void;
   updateEcoTrack: (ecotrack: Partial<StoreSettings["ecotrack"]>) => void;
+  updateNordEtOuest: (nordEtOuest: Partial<StoreSettings["nordEtOuest"]>) => void;
   updatePixels: (pixels: Partial<StoreSettings["pixels"]>) => void;
   getShippingFee: (wilayaValue: string, deliveryType: "home" | "desk") => number;
 }
@@ -67,6 +68,15 @@ export const useSettingsStore = create<SettingsState>()(
           settings: {
             ...state.settings,
             ecotrack: { ...state.settings.ecotrack, ...ecotrackUpdates },
+          },
+        }));
+      },
+
+      updateNordEtOuest: (nordUpdates) => {
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            nordEtOuest: { ...(state.settings.nordEtOuest || DEFAULT_STORE_SETTINGS.nordEtOuest), ...nordUpdates },
           },
         }));
       },

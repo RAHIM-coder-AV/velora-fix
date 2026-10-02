@@ -6,11 +6,21 @@ export type UserRole = "customer" | "admin";
 
 export type OrderStatus =
   | "pending"
+  | "pending_confirmation"
   | "confirmed"
+  | "customer_confirmed"
   | "processing"
+  | "no_answer"
+  | "postponed"
+  | "busy"
+  | "waiting_customer"
   | "shipped"
   | "delivered"
-  | "cancelled";
+  | "cancelled"
+  | "customer_cancelled"
+  | "fake"
+  | "duplicate"
+  | "returned";
 
 export type PaymentMethod = "cod";
 
@@ -120,6 +130,7 @@ export interface Order {
   email?: string;
   customerName: string;
   phone: string;
+  phone2?: string;
   wilaya: string;
   commune: string;
   address: string;
@@ -131,6 +142,11 @@ export interface Order {
   total: number;
   items: OrderItem[];
   offerTitle?: string;
+  isStopdesk?: boolean;
+  trackingCode?: string;
+  deliveryCompany?: "ecotrack" | "nord_ouest" | string;
+  deliveryDispatchedAt?: string;
+  labelUrl?: string;
   createdAt: string;
 }
 

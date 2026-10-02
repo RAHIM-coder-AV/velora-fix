@@ -55,9 +55,16 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   freeShippingThreshold: 25000,
   wilayaPrices: getDefaultWilayaPrices(),
   ecotrack: {
-    enabled: false,
-    token: "",
+    enabled: true,
+    token: "demo_ecotrack_token_dz",
     baseUrl: "https://api.ecotrack.dz/api/v1",
+    shopId: "",
+    autoSendConfirmed: false,
+  },
+  nordEtOuest: {
+    enabled: true,
+    token: "demo_nord_ouest_token_dz",
+    baseUrl: "https://api.nordetouest.com/api/v1",
     shopId: "",
     autoSendConfirmed: false,
   },

@@ -16,6 +16,14 @@ export interface EcoTrackSettings {
   autoSendConfirmed: boolean; // إرسال الطلب تلقائياً عند تأكيده
 }
 
+export interface NordEtOuestSettings {
+  enabled: boolean;
+  token: string;
+  baseUrl: string;
+  shopId?: string;
+  autoSendConfirmed: boolean;
+}
+
 export interface PixelSettings {
   facebookPixel1: string;
   facebookPixel1Enabled: boolean;
@@ -32,5 +40,7 @@ export interface StoreSettings {
   freeShippingThreshold: number;
   wilayaPrices: Record<string, WilayaDeliveryPrice>;
   ecotrack: EcoTrackSettings;
+  nordEtOuest: NordEtOuestSettings;
   pixels: PixelSettings;
 }
+

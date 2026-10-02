@@ -340,6 +340,16 @@ interface CatalogState {
   updateOrder: (order: Order) => void;
   deleteOrder: (id: string) => void;
   setOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
+  bulkSetOrderStatus: (ids: string[], status: OrderStatus) => void;
+  updateOrderDelivery: (
+    id: string,
+    deliveryData: {
+      deliveryCompany: string;
+      trackingCode: string;
+      status?: OrderStatus;
+      labelUrl?: string;
+    }
+  ) => void;
   setVariantStock: (productId: string, variantId: string, stock: number) => Promise<void>;
   listProducts: (filters?: Filters) => Product[];
   getProduct: (slug: string) => Product | undefined;
@@ -427,6 +437,27 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
       await db.updateOrderStatus(client, id, status);
     }
     const updated = get().orders.map((o) => (o.id === id ? { ...o, status } : o));
+    set({ orders: updated });
+    saveOrders(updated);
+  },
+  bulkSetOrderStatus: (ids, status) => {
+    const updated = get().orders.map((o) => (ids.includes(o.id) ? { ...o, status } : o));
+    set({ orders: updated });
+    saveOrders(updated);
+  },
+  updateOrderDelivery: (id, deliveryData) => {
+    const updated = get().orders.map((o) =>
+      o.id === id
+        ? {
+            ...o,
+            deliveryCompany: deliveryData.deliveryCompany,
+            trackingCode: deliveryData.trackingCode,
+            status: deliveryData.status || "shipped",
+            deliveryDispatchedAt: new Date().toISOString(),
+            labelUrl: deliveryData.labelUrl || o.labelUrl,
+          }
+        : o
+    );
     set({ orders: updated });
     saveOrders(updated);
   },
