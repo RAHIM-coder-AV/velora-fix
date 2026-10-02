@@ -68,15 +68,24 @@ select option {
 }
 
 select.public-select {
-  color-scheme: light !important;
-  background-color: #ffffff !important;
-  color: #111827 !important;
+  color-scheme: dark;
 }
 
-select.public-select option {
-  color-scheme: light !important;
-  background-color: #ffffff !important;
-  color: #111827 !important;
+.product-order-form .form-control {
+  border-color: #52525b;
+  background-color: #18181b;
+  color: #ffffff;
+  color-scheme: dark;
+}
+
+.product-order-form .form-control::placeholder {
+  color: #a1a1aa;
+  opacity: 1;
+}
+
+.product-order-form select.form-control option {
+  background-color: #18181b !important;
+  color: #ffffff !important;
 }
 
 a {

@@ -226,7 +226,7 @@ export function QuickOrderForm({
                   }}
                   placeholder={locale === "ar" ? "الاسم واللقب" : "Nom et prénom"}
                   className={cn(
-                    "w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-300 dark:bg-white dark:text-zinc-900 dark:placeholder:text-zinc-400",
+                    "form-control w-full rounded-lg border px-3.5 py-2.5 text-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500",
                     errors.name ? "border-red-500 ring-1 ring-red-500" : "border-zinc-300 dark:border-zinc-300"
                   )}
                 />
@@ -251,7 +251,7 @@ export function QuickOrderForm({
                   placeholder={locale === "ar" ? "05 / 06 / 07 ..." : "0550 00 00 00"}
                   dir="ltr"
                   className={cn(
-                    "w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-right dark:border-zinc-300 dark:bg-white dark:text-zinc-900 dark:placeholder:text-zinc-400",
+                    "form-control w-full rounded-lg border px-3.5 py-2.5 text-sm text-right transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500",
                     errors.phone ? "border-red-500 ring-1 ring-red-500" : "border-zinc-300 dark:border-zinc-300"
                   )}
                 />
@@ -274,7 +274,7 @@ export function QuickOrderForm({
                   if (errors.wilaya) setErrors({ ...errors, wilaya: "" });
                 }}
                 className={cn(
-                  "public-select w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-zinc-900 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-300 dark:bg-white dark:text-zinc-900",
+                  "public-select form-control w-full rounded-lg border px-3.5 py-2.5 text-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500",
                   errors.wilaya ? "border-red-500" : "border-zinc-300 dark:border-zinc-300"
                 )}
               >
@@ -301,7 +301,7 @@ export function QuickOrderForm({
                       if (errors.commune) setErrors({ ...errors, commune: "" });
                     }}
                     className={cn(
-                      "public-select w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-zinc-900 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-300 dark:bg-white dark:text-zinc-900",
+                      "public-select form-control w-full rounded-lg border px-3 py-2.5 text-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500",
                       errors.commune ? "border-red-500" : "border-zinc-300 dark:border-zinc-300"
                     )}
                   >
@@ -324,7 +324,7 @@ export function QuickOrderForm({
                   }}
                   placeholder={locale === "ar" ? "اكتب البلدية" : "Entrez votre commune"}
                   className={cn(
-                    "w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-300 dark:bg-white dark:text-zinc-900 dark:placeholder:text-zinc-400",
+                    "form-control w-full rounded-lg border px-3.5 py-2.5 text-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500",
                     errors.commune ? "border-red-500" : "border-zinc-300 dark:border-zinc-300"
                   )}
                 />
@@ -395,7 +395,7 @@ export function QuickOrderForm({
                   ? (locale === "ar" ? "الحي، الشارع، أو علامة مميزة" : "Rue, quartier, etc.")
                   : (locale === "ar" ? "مثال: مكتب ياليدين أو برو كوليس في وسط المدينة" : "Ex: Bureau Yalidine centre-ville")
               }
-              className="w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-300 dark:bg-white dark:text-zinc-900 dark:placeholder:text-zinc-400"
+              className="form-control w-full rounded-lg border px-3.5 py-2.5 text-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
         </div>
