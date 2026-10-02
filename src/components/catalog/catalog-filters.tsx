@@ -30,7 +30,7 @@ export function CatalogFilters({
   }
 
   return (
-    <aside className="space-y-6 border-b border-line pb-6 md:border-b-0 md:border-e md:pe-8 md:pb-0">
+    <aside className="grid min-w-0 grid-cols-1 gap-4 border-b border-line pb-5 sm:grid-cols-2 sm:gap-5 md:block md:space-y-6 md:border-b-0 md:border-e md:pe-8 md:pb-0">
       <p className="text-[11px] tracking-[0.2em] uppercase text-muted">{dict.catalog.filters}</p>
       <Field label={dict.catalog.category}>
         <Select
@@ -46,7 +46,7 @@ export function CatalogFilters({
         </Select>
       </Field>
       <Field label={dict.catalog.price}>
-        <div className="flex gap-2">
+        <div className="grid min-w-0 grid-cols-2 gap-2">
           <Input
             inputMode="numeric"
             placeholder={dict.catalog.min}
@@ -72,7 +72,7 @@ export function CatalogFilters({
           <option value="rating">{dict.catalog.rating}</option>
         </Select>
       </Field>
-      <div className="flex gap-2">
+      <div className="flex min-w-0 gap-2 sm:col-span-2 md:col-span-1">
         <Button
           type="button"
           className="flex-1"

@@ -69,7 +69,7 @@ export default async function LocaleLayout({
       <body className="flex min-h-full flex-col" dir={dir}>
         <LocaleProvider locale={locale} dict={dict}>
           <Navbar />
-          <main className="flex-1">
+          <main className="min-w-0 flex-1">
             <SessionProvider>{children}</SessionProvider>
           </main>
           <Footer />

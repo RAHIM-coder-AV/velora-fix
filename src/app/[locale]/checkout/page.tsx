@@ -7,7 +7,7 @@ import { Container, SectionHeading } from "@/components/ui/container";
 export default function CheckoutPage() {
   const { dict } = useLocale();
   return (
-    <Container className="py-14">
+    <Container className="py-8 sm:py-14">
       <SectionHeading title={dict.checkout.title} />
       <CheckoutForm />
     </Container>

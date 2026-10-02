@@ -57,14 +57,14 @@ export function CartView() {
   }
 
   return (
-    <div className="grid gap-12 lg:grid-cols-[1fr_320px]">
+    <div className="grid min-w-0 gap-6 sm:gap-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-12">
       <ul className="divide-y divide-line">
         {lines.map(({ item, product, variant }) => (
-          <li key={item.variantId} className="flex gap-4 py-6">
+          <li key={item.variantId} className="flex min-w-0 flex-wrap gap-3 py-5 sm:flex-nowrap sm:gap-4 sm:py-6">
             <div className="relative h-28 w-20 shrink-0 overflow-hidden bg-cream-2">
               <Image src={product.images[0].url} alt="" fill className="object-cover" sizes="80px" />
             </div>
-            <div className="flex flex-1 flex-col justify-between">
+            <div className="flex min-w-0 flex-1 flex-col justify-between">
               <div>
                 <LocaleLink href={`/product/${product.slug}`} className="text-sm">
                   {product.name[locale]}
@@ -73,7 +73,7 @@ export function CartView() {
                   {variant.size} · {variant.color[locale]}
                 </p>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <QuantitySelector
                   value={item.quantity}
                   max={variant.stock}
@@ -88,11 +88,11 @@ export function CartView() {
                 </button>
               </div>
             </div>
-            <p className="text-sm">{formatPrice(product.price * item.quantity, locale)}</p>
+            <p className="ms-auto text-sm sm:ms-0">{formatPrice(product.price * item.quantity, locale)}</p>
           </li>
         ))}
       </ul>
-      <aside className="h-fit border border-line bg-white p-6">
+      <aside className="h-fit min-w-0 border border-line bg-white p-4 sm:p-6 lg:sticky lg:top-24">
         <h2 className="font-serif text-2xl">{dict.cart.title}</h2>
         <dl className="mt-6 space-y-3 text-sm">
           <div className="flex justify-between">

@@ -23,7 +23,7 @@ export default async function HomePage({
 
   return (
     <div>
-      <section className="relative flex min-h-[80vh] items-center overflow-hidden bg-cream-2">
+      <section className="relative flex min-h-[68vh] items-center overflow-hidden bg-cream-2 py-12 sm:min-h-[80vh] sm:py-0">
         <Image
           src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=2000&q=80"
           alt=""
@@ -36,22 +36,22 @@ export default async function HomePage({
           <p className="mb-4 text-[11px] tracking-[0.3em] uppercase text-cream/80">
             {dict.hero.kicker}
           </p>
-          <h1 className="max-w-xl whitespace-pre-line font-serif text-5xl leading-tight md:text-7xl">
+          <h1 className="max-w-xl whitespace-pre-line break-words font-serif text-4xl leading-tight sm:text-5xl md:text-7xl">
             {dict.hero.title}
           </h1>
           <p className="mt-6 max-w-md text-sm leading-7 text-cream/90">
             {dict.hero.subtitle}
           </p>
-          <div className="mt-10 flex flex-wrap gap-4">
+          <div className="mt-8 flex flex-wrap gap-3 sm:mt-10 sm:gap-4">
             <Link
               href={`/${locale}/products`}
-              className="bg-cream px-8 py-4 text-xs font-medium uppercase tracking-[0.16em] text-ink transition hover:bg-white"
+              className="bg-cream px-5 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-ink transition hover:bg-white sm:px-8 sm:py-4 sm:text-xs sm:tracking-[0.16em]"
             >
               {dict.hero.cta}
             </Link>
             <Link
               href={`/${locale}/categories`}
-              className="border border-cream px-8 py-4 text-xs font-medium uppercase tracking-[0.16em] text-cream transition hover:bg-cream hover:text-ink"
+              className="border border-cream px-5 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-cream transition hover:bg-cream hover:text-ink sm:px-8 sm:py-4 sm:text-xs sm:tracking-[0.16em]"
             >
               {dict.hero.secondary}
             </Link>

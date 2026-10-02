@@ -17,13 +17,13 @@ export function LanguageSwitcher() {
   }
 
   return (
-    <div className="flex items-center gap-2 text-[11px] tracking-[0.18em] uppercase">
+    <div className="flex shrink-0 items-center gap-1 text-[10px] tracking-[0.12em] uppercase sm:gap-2 sm:text-[11px] sm:tracking-[0.18em]">
       {locales.map((l) => (
         <button
           key={l}
           type="button"
           onClick={() => switchTo(l)}
-          className={l === locale ? "text-ink" : "text-muted hover:text-ink"}
+          className={`px-1.5 py-2 ${l === locale ? "text-ink" : "text-muted hover:text-ink"}`}
         >
           {l}
         </button>

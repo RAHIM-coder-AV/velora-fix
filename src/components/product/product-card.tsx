@@ -44,9 +44,9 @@ export function ProductCard({ product }: { product: Product }) {
         ) : null}
       </div>
       <Link href={href} className="block space-y-1">
-        <h3 className="text-sm">{product.name[locale]}</h3>
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm">
+        <h3 className="break-words text-sm">{product.name[locale]}</h3>
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          <p className="min-w-0 text-xs sm:text-sm">
             {formatPrice(product.price, locale)}
             {product.compareAtPrice ? (
               <span className="ms-2 text-muted line-through">

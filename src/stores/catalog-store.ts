@@ -355,6 +355,7 @@ function saveAbandonedCheckouts(drafts: AbandonedCheckout[]) {
 interface CatalogState {
   products: Product[];
   categories: Category[];
+  catalogLoadState: "loading" | "ready" | "error";
   orders: Order[];
   abandonedCheckouts: AbandonedCheckout[];
   reviews: Review[];
@@ -391,15 +392,25 @@ const sb = () => (isSupabaseConfigured() ? createClient() : null);
 export const useCatalogStore = create<CatalogState>()((set, get) => ({
   products: getStoredProducts(),
   categories: seedCategories,
+  catalogLoadState: isSupabaseConfigured() ? "loading" : "ready",
   orders: getStoredOrders(),
   abandonedCheckouts: getStoredAbandonedCheckouts(),
   reviews: seedReviews,
   refresh: async () => {
     const client = sb();
-    if (!client) return;
-    const { categories, products, reviews } = await db.fetchCatalog(client);
-    set({ categories, products, reviews });
-    saveProducts(products);
+    if (!client) {
+      set({ catalogLoadState: "ready" });
+      return;
+    }
+    set({ catalogLoadState: "loading" });
+    try {
+      const { categories, products, reviews } = await db.fetchCatalog(client);
+      set({ categories, products, reviews, catalogLoadState: "ready" });
+      saveProducts(products);
+    } catch (error) {
+      set({ catalogLoadState: "error" });
+      throw error;
+    }
   },
   refreshOrders: async (all = false) => {
     const client = sb();

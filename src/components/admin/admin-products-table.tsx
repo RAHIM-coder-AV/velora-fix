@@ -123,8 +123,8 @@ export function AdminProductsTable({
       </div>
 
       {/* Table Container */}
-      <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <table className="w-full border-collapse text-right text-xs">
+      <div className="max-w-full overflow-x-auto overscroll-x-contain rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <table className="w-full min-w-[680px] border-collapse text-right text-xs">
           <thead>
             <tr className="border-b border-zinc-200 bg-zinc-50/80 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-400">
               <th className="py-3.5 px-4">{locale === "ar" ? "المنتج" : "Produit"}</th>

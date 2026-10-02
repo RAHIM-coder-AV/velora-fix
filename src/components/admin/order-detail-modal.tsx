@@ -166,13 +166,13 @@ export function OrderDetailModal({
   const alreadyDispatched = Boolean(order.trackingCode);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl dark:bg-zinc-900 dark:text-zinc-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 backdrop-blur-sm sm:p-4">
+      <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl sm:max-h-[90vh] dark:bg-zinc-900 dark:text-zinc-100">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-serif text-lg font-bold">
+        <div className="flex items-center justify-between gap-2 border-b border-zinc-200 px-3 py-3 sm:px-6 sm:py-4 dark:border-zinc-800">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="break-all font-serif text-base font-bold sm:text-lg">
                 {locale === "ar" ? "طلب رقم" : "Commande"} #{order.reference}
               </span>
               <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${currentStatus.bg}`}>
@@ -184,10 +184,10 @@ export function OrderDetailModal({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300"
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-2 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-100 sm:px-3 sm:text-xs dark:border-zinc-700 dark:text-zinc-300"
               title={locale === "ar" ? "طباعة وصل الطلب" : "Imprimer"}
             >
               <Printer size={15} />
@@ -203,7 +203,7 @@ export function OrderDetailModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 space-y-5 overflow-y-auto p-6">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:space-y-5 sm:p-6">
           {/* Dispatch Banner: already dispatched */}
           {alreadyDispatched && !dispatchResult && (
             <div className="flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3.5 dark:border-indigo-800 dark:bg-indigo-950/30">

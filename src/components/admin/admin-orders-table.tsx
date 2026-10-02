@@ -418,7 +418,7 @@ export function AdminOrdersTable({
       {/* Top Search & Filter Bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Search Input */}
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative min-w-0 flex-1 max-w-sm">
           <Search size={16} className="absolute start-3 top-3 text-zinc-400" />
           <input
             type="text"
@@ -430,7 +430,7 @@ export function AdminOrdersTable({
         </div>
 
         {/* Filter Badges matching screenshot */}
-        <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain pb-1 text-xs">
           {[
             { id: "all", label: locale === "ar" ? "الكل" : "Tous", count: orders.length },
             { id: "pending", label: locale === "ar" ? "جديد" : "Nouveau", count: orders.filter((o) => o.status === "pending").length },
@@ -462,7 +462,7 @@ export function AdminOrdersTable({
 
       {/* Bulk Action Bar matching Screenshot style */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex items-center gap-2 text-xs font-bold text-zinc-700 dark:text-zinc-300">
+        <div className="flex w-full flex-wrap items-center gap-2 text-xs font-bold text-zinc-700 sm:w-auto dark:text-zinc-300">
           <span className="rounded-lg bg-purple-100 px-2 py-1 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
             {locale === "ar" ? `الطلبات المحددة: ${selectedOrderIds.length}` : `Sélectionnés : ${selectedOrderIds.length}`}
           </span>
@@ -477,7 +477,7 @@ export function AdminOrdersTable({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {/* Export button */}
           <button
             type="button"
@@ -499,7 +499,7 @@ export function AdminOrdersTable({
           </button>
 
           {/* Delivery Dispatch Buttons */}
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <button
               type="button"
               disabled={selectedOrderIds.length === 0 || bulkDispatching !== null}
@@ -557,8 +557,8 @@ export function AdminOrdersTable({
       </div>
 
       {/* Orders Table Container */}
-      <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <table className="w-full border-collapse text-right text-xs">
+      <div className="max-w-full overflow-x-auto overscroll-x-contain rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <table className="w-full min-w-[760px] border-collapse text-right text-xs">
           <thead>
             <tr className="border-b border-zinc-200 bg-zinc-50/80 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-400">
               <th className="py-3.5 px-4 text-center">
@@ -708,7 +708,7 @@ export function AdminOrdersTable({
                         {/* Interactive Dropdown Menu (Styled exactly as in reference screenshot) */}
                         {isDropdownOpen && (
                           <div
-                            className="absolute start-0 top-full z-30 mt-1.5 w-64 max-h-80 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900 p-1.5 shadow-2xl text-zinc-200"
+                            className="absolute start-0 top-full z-30 mt-1.5 max-h-80 w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900 p-1.5 text-zinc-200 shadow-2xl"
                             dir={locale === "ar" ? "rtl" : "ltr"}
                           >
                             {/* Standard Statuses */}

@@ -35,7 +35,7 @@ export function AdminAbandonedCheckouts({ drafts, orders }: AdminAbandonedChecko
   const undeliveredOrders = orders.filter((order) => isUndeliveredOrder(order.status));
 
   return (
-    <div className="space-y-6" dir={locale === "ar" ? "rtl" : "ltr"}>
+    <div className="min-w-0 space-y-6" dir={locale === "ar" ? "rtl" : "ltr"}>
       <div>
         <h1 className="text-xl font-black text-zinc-900 dark:text-zinc-100">
           {locale === "ar" ? "الطلبات المتروكة" : "Commandes abandonnées"}

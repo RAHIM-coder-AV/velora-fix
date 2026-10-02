@@ -25,7 +25,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-cream/95 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 md:px-8">
+      <div className="mx-auto flex min-w-0 max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-5 sm:py-4 md:px-8">
         <button type="button" className="md:hidden" onClick={() => setOpen(true)} aria-label="menu">
           <Menu size={20} />
         </button>
@@ -36,10 +36,10 @@ export function Navbar() {
             </LocaleLink>
           ))}
         </nav>
-        <LocaleLink href="/" className="font-serif text-2xl tracking-[0.28em]">
+        <LocaleLink href="/" className="min-w-0 truncate text-center font-serif text-xl tracking-[0.16em] sm:text-2xl sm:tracking-[0.28em]">
           {STORE_NAME}
         </LocaleLink>
-        <div className="flex items-center gap-4">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           <SearchBar />
           <LanguageSwitcher />
           <LocaleLink href="/wishlist" aria-label={dict.nav.wishlist}>
@@ -62,7 +62,7 @@ export function Navbar() {
         </div>
       </div>
       {open ? (
-        <div className="fixed inset-0 z-50 bg-cream md:hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-cream pb-[env(safe-area-inset-bottom)] md:hidden">
           <div className="flex items-center justify-between px-5 py-4">
             <span className="font-serif text-xl tracking-[0.24em]">{STORE_NAME}</span>
             <button type="button" onClick={() => setOpen(false)} aria-label={dict.common.close}>

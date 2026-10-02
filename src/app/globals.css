@@ -25,12 +25,19 @@
 
 html,
 body {
+  width: 100%;
+  max-width: 100%;
   background: var(--cream);
   color: var(--ink);
 }
 
+html {
+  overflow-x: clip;
+}
+
 body {
   font-family: var(--font-outfit), system-ui, sans-serif;
+  overflow-x: clip;
 }
 
 html[lang="ar"] body,
@@ -90,4 +97,13 @@ select.public-select {
 
 a {
   text-underline-offset: 4px;
+}
+
+@media (max-width: 374px) {
+  input,
+  select,
+  textarea,
+  button {
+    max-width: 100%;
+  }
 }

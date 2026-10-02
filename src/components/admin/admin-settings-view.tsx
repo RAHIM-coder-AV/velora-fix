@@ -221,11 +221,11 @@ export function AdminSettingsView() {
         </div>
 
         {/* Tab Switcher */}
-        <div className="inline-flex rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
+        <div className="grid w-full grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 sm:inline-flex sm:w-auto sm:grid-cols-none dark:bg-zinc-800">
           <button
             type="button"
             onClick={() => setActiveSubTab("delivery")}
-            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+            className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-center text-[11px] font-bold transition sm:px-3.5 sm:py-1.5 sm:text-xs ${
               activeSubTab === "delivery"
                 ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
                 : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
@@ -238,7 +238,7 @@ export function AdminSettingsView() {
           <button
             type="button"
             onClick={() => setActiveSubTab("ecotrack")}
-            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+            className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-center text-[11px] font-bold transition sm:px-3.5 sm:py-1.5 sm:text-xs ${
               activeSubTab === "ecotrack"
                 ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
                 : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
@@ -251,7 +251,7 @@ export function AdminSettingsView() {
           <button
             type="button"
             onClick={() => setActiveSubTab("nord_ouest")}
-            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+            className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-center text-[11px] font-bold transition sm:px-3.5 sm:py-1.5 sm:text-xs ${
               activeSubTab === "nord_ouest"
                 ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
                 : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
@@ -264,7 +264,7 @@ export function AdminSettingsView() {
           <button
             type="button"
             onClick={() => setActiveSubTab("pixels")}
-            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+            className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-center text-[11px] font-bold transition sm:px-3.5 sm:py-1.5 sm:text-xs ${
               activeSubTab === "pixels"
                 ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
                 : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"

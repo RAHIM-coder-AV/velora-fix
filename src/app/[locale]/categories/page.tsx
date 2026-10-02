@@ -17,7 +17,7 @@ export default async function CategoriesPage({
   const categories = getSeedCategories();
 
   return (
-    <Container className="py-14">
+    <Container className="py-8 sm:py-14">
       <SectionHeading title={dict.categoriesPage.title} />
       <p className="-mt-6 mb-10 max-w-lg text-sm text-muted">{dict.categoriesPage.subtitle}</p>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -25,7 +25,7 @@ export default async function CategoriesPage({
           <Link
             key={c.id}
             href={`/${locale}/products?category=${c.slug}`}
-            className="group relative flex h-80 items-end overflow-hidden bg-cream-2 p-8"
+            className="group relative flex h-64 items-end overflow-hidden bg-cream-2 p-5 sm:h-80 sm:p-8"
           >
             <Image
               src={c.image}

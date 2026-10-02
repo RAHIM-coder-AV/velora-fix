@@ -27,6 +27,7 @@ import { isUndeliveredOrder } from "@/lib/orders/abandoned";
 import { AdminProductsTable } from "@/components/admin/admin-products-table";
 import { AdminSettingsView } from "@/components/admin/admin-settings-view";
 import { cn } from "@/lib/utils";
+import { isSupabaseConfigured } from "@/lib/supabase/configured";
 
 type AdminTab = "stats" | "orders" | "abandoned" | "products" | "settings";
 
@@ -106,29 +107,43 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 pb-20 dark:bg-zinc-950">
+      {!isSupabaseConfigured() && (
+        <div className="mx-auto max-w-7xl px-3 pt-3 sm:px-6" role="alert">
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+            <p className="font-bold">
+              {locale === "ar" ? "المتجر غير متصل بقاعدة بيانات مشتركة" : "La boutique n’est pas reliée à une base de données"}
+            </p>
+            <p className="mt-1">
+              {locale === "ar"
+                ? "المنتجات التي تحفظها هنا تبقى في هذا المتصفح فقط ولا تظهر للعملاء على أجهزتهم. اربط Supabase في إعدادات النشر لحفظها ومشاركتها."
+                : "Les produits enregistrés ici restent dans ce navigateur et ne sont pas visibles par les clients sur leurs appareils. Configurez Supabase dans le déploiement pour les enregistrer et les partager."}
+            </p>
+          </div>
+        </div>
+      )}
       {/* Admin Top Header Navigation */}
       <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/95">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
+        <div className="mx-auto flex min-w-0 max-w-7xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-3 sm:flex-nowrap sm:px-6">
           {/* Brand & Store Link */}
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-600 font-bold text-white shadow-md shadow-purple-600/30">
               V
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-serif text-base font-bold">Velora Admin</span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-2">
+                <span className="truncate font-serif text-sm font-bold sm:text-base">Velora Admin</span>
                 <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
                   لوحة التحكم
                 </span>
               </div>
-              <p className="text-[10px] text-zinc-500">
+              <p className="truncate text-[10px] text-zinc-500">
                 {user?.fullName || "Abderrahim kouriche"}
               </p>
             </div>
           </div>
 
           {/* Quick Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Link
               href={`/${locale}`}
               target="_blank"
@@ -150,7 +165,7 @@ export default function AdminPage() {
 
         {/* Navigation Tabs Bar (Matching Screenshot Style) */}
         <div className="mx-auto flex max-w-7xl overflow-x-auto px-4 sm:px-6">
-          <nav className="flex gap-2 py-1 text-xs">
+          <nav className="flex w-max min-w-full gap-2 py-1 text-xs">
             <button
               onClick={() => setActiveTab("orders")}
               className={cn(
@@ -242,10 +257,10 @@ export default function AdminPage() {
       </header>
 
       {/* Main Content Area */}
-      <main className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
+      <main className="mx-auto min-w-0 max-w-7xl px-3 pt-4 sm:px-6 sm:pt-6">
         {/* Quick KPI Overview Cards */}
-        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="mb-5 grid grid-cols-2 gap-2 sm:mb-6 sm:gap-4 sm:grid-cols-4">
+          <div className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xs sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex items-center justify-between text-zinc-400">
               <span className="text-[11px] font-bold uppercase tracking-wider">
                 {locale === "ar" ? "المبيعات الإجمالية" : "Revenu"}
@@ -257,7 +272,7 @@ export default function AdminPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xs sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex items-center justify-between text-zinc-400">
               <span className="text-[11px] font-bold uppercase tracking-wider">
                 {locale === "ar" ? "إجمالي الطلبات" : "Commandes"}
@@ -269,7 +284,7 @@ export default function AdminPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xs sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex items-center justify-between text-zinc-400">
               <span className="text-[11px] font-bold uppercase tracking-wider">
                 {locale === "ar" ? "قيد المعالجة" : "En cours"}
@@ -281,7 +296,7 @@ export default function AdminPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xs sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex items-center justify-between text-zinc-400">
               <span className="text-[11px] font-bold uppercase tracking-wider">
                 {locale === "ar" ? "إجمالي المنتجات" : "Produits"}

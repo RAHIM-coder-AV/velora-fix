@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { usePathname } from "next/navigation";
 import { STORE_NAME } from "@/lib/constants";
 import { useLocale } from "@/providers/locale-provider";
 import { LocaleLink } from "@/components/layout/language-switcher";
@@ -8,6 +9,8 @@ import { toast } from "@/components/ui/toast";
 
 export function Footer() {
   const { dict } = useLocale();
+  const pathname = usePathname();
+  const hasMobileBottomNav = !pathname.includes("/admin") && !pathname.includes("/checkout");
   const [email, setEmail] = useState("");
 
   function onSubmit(e: FormEvent) {
@@ -18,8 +21,8 @@ export function Footer() {
   }
 
   return (
-    <footer className="mt-auto border-t border-line bg-cream-2 pb-20 md:pb-0">
-      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:grid-cols-4 md:px-8">
+    <footer className={`mt-auto border-t border-line bg-cream-2 ${hasMobileBottomNav ? "pb-20 md:pb-0" : ""}`}>
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:gap-10 sm:px-5 sm:py-14 md:grid-cols-4 md:px-8">
         <div>
           <p className="font-serif text-2xl tracking-[0.24em]">{STORE_NAME}</p>
           <p className="mt-4 max-w-xs text-sm leading-6 text-muted">{dict.hero.subtitle}</p>

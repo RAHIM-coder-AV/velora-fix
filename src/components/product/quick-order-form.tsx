@@ -232,7 +232,7 @@ export function QuickOrderForm({
   }
 
   return (
-    <div className="product-order-form rounded-xl border-2 border-emerald-500/30 bg-white p-5 shadow-xl md:p-7 dark:bg-zinc-900">
+    <div className="product-order-form min-w-0 rounded-xl border-2 border-emerald-500/30 bg-white p-3 shadow-xl sm:p-5 md:p-7 dark:bg-zinc-900">
       {/* Top Banner Notice */}
       <div className="mb-5 flex items-center justify-between rounded-lg bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
         <span className="flex items-center gap-1.5">
@@ -271,7 +271,7 @@ export function QuickOrderForm({
             {locale === "ar" ? "معلومات الزبون" : "Vos coordonnées"}
           </h3>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             {/* Full Name */}
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-700 dark:text-zinc-300">

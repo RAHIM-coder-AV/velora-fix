@@ -240,10 +240,10 @@ export function ProductEditModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl dark:bg-zinc-900 dark:text-zinc-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 backdrop-blur-sm sm:p-4">
+      <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl sm:max-h-[90vh] dark:bg-zinc-900 dark:text-zinc-100">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+        <div className="flex items-center justify-between gap-2 border-b border-zinc-200 px-3 py-3 sm:px-6 sm:py-4 dark:border-zinc-800">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
               <Layers size={18} />
@@ -261,7 +261,7 @@ export function ProductEditModal({
         </div>
 
         {/* Tabs Bar */}
-        <div className="flex flex-wrap border-b border-zinc-200 px-6 dark:border-zinc-800">
+        <div className="flex flex-wrap border-b border-zinc-200 px-2 sm:px-6 dark:border-zinc-800">
           <button
             type="button"
             onClick={() => setActiveTab("general")}

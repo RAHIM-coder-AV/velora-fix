@@ -17,12 +17,12 @@ function ProductsPageContent() {
   const products = listProducts(filters);
 
   return (
-    <Container className="py-14">
+    <Container className="py-8 sm:py-14">
       <SectionHeading title={dict.catalog.title} />
-      <div className="grid gap-10 md:grid-cols-[220px_1fr]">
+      <div className="grid min-w-0 gap-6 md:grid-cols-[220px_minmax(0,1fr)] md:gap-10">
         <CatalogFilters categories={categories} basePath={`/${params.locale}/products`} />
-        <div>
-          <p className="mb-6 text-xs uppercase tracking-[0.16em] text-muted">
+        <div className="min-w-0">
+          <p className="mb-4 text-xs uppercase tracking-[0.1em] text-muted sm:mb-6 sm:tracking-[0.16em]">
             {products.length} {dict.catalog.results}
           </p>
           {products.length === 0 ? (

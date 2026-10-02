@@ -210,9 +210,9 @@ export function CheckoutForm() {
       onSubmit={onSubmit}
       onFocusCapture={abandonedCheckout.startTracking}
       onClickCapture={abandonedCheckout.startTracking}
-      className="grid gap-12 lg:grid-cols-[1fr_320px]"
+      className="grid min-w-0 gap-6 sm:gap-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-12"
     >
-      <div className="space-y-5">
+      <div className="min-w-0 space-y-5">
         <h2 className="font-serif text-2xl">{dict.checkout.details}</h2>
         <label className="flex items-start gap-2 rounded-lg border border-line p-3 text-xs leading-5 text-muted">
           <input
@@ -279,7 +279,7 @@ export function CheckoutForm() {
           <p className="mt-1 text-sm text-muted">{dict.checkout.codHelp}</p>
         </div>
       </div>
-      <aside className="h-fit border border-line bg-white p-6">
+      <aside className="h-fit min-w-0 border border-line bg-white p-4 sm:p-6 lg:sticky lg:top-24">
         <h2 className="font-serif text-2xl">{dict.checkout.review}</h2>
         <ul className="mt-4 space-y-2 text-sm">
           {lines.map((l) => (

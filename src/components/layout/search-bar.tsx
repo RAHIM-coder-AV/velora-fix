@@ -25,7 +25,7 @@ export function SearchBar({ compact = false }: { compact?: boolean }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={dict.catalog.searchPlaceholder}
-          className="w-full min-w-[220px] border-b border-line bg-transparent py-2 ps-9 pe-3 text-sm outline-none focus:border-ink"
+          className="w-full min-w-0 border-b border-line bg-transparent py-2 ps-9 pe-3 text-sm outline-none focus:border-ink"
         />
       </label>
     </form>

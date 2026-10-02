@@ -26,7 +26,7 @@ export function MobileBottomNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-cream/95 pb-[env(safe-area-inset-bottom)] md:hidden">
-      <ul className="grid grid-cols-5">
+      <ul className="grid grid-cols-5 pb-1">
         {items.map((item) => {
           const href = `/${locale}${item.href === "/" ? "" : item.href}`;
           const active = pathname === href || (item.href !== "/" && pathname.startsWith(href));
@@ -36,7 +36,7 @@ export function MobileBottomNav() {
               <LocaleLink
                 href={item.href}
                 className={cn(
-                  "relative flex flex-col items-center gap-1 py-2 text-[10px] tracking-wide",
+                  "relative flex min-w-0 flex-col items-center gap-1 px-0.5 py-2 text-center text-[9px] leading-tight tracking-normal sm:text-[10px] sm:tracking-wide",
                   active ? "text-ink" : "text-muted",
                 )}
               >
