@@ -11,6 +11,7 @@ import { Footer } from "@/components/layout/footer";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { ToastHost } from "@/components/ui/toast";
 import { AnalyticsScripts } from "@/components/analytics/analytics-scripts";
+import { MarketingConsentBanner } from "@/components/analytics/marketing-consent-banner";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -75,6 +76,7 @@ export default async function LocaleLayout({
           <MobileBottomNav />
           <ToastHost />
           <AnalyticsScripts />
+          <MarketingConsentBanner />
         </LocaleProvider>
       </body>
     </html>

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/catalog/product-options.test.ts",
+    "test": "tsx --test src/lib/catalog/product-options.test.ts src/lib/analytics/pixels.test.ts src/lib/orders/abandoned.test.ts",
     "seed": "dotenv -e .env.local -- tsx scripts/seed.ts"
   },
   "dependencies": {

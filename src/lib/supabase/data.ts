@@ -7,7 +7,9 @@ import type {
   Product,
   Profile,
   Review,
+  AbandonedCheckout,
 } from "@/types";
+import type { PixelSettings } from "@/types/settings";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -257,35 +259,50 @@ export async function fetchCatalog(sb: SupabaseClient) {
 }
 
 // ---------- Orders ----------
-export async function placeOrder(sb: SupabaseClient, order: Order): Promise<string> {
-  const { data, error } = await sb.rpc("place_order", {
-    payload: {
-      user_id: order.userId ?? null,
-      email: order.email,
-      customer_name: order.customerName,
-      phone: order.phone,
-      wilaya: order.wilaya,
-      commune: order.commune,
-      address: order.address,
-      notes: order.notes ?? "",
-      payment_method: order.paymentMethod,
-      subtotal: order.subtotal,
-      shipping: order.shipping,
-      total: order.total,
-      items: order.items.map((i) => ({
-        product_id: i.productId,
-        variant_id: i.variantId,
-        name_fr: i.name.fr,
-        name_ar: i.name.ar,
-        size: i.size,
-        color_fr: i.color.fr,
-        color_ar: i.color.ar,
-        image: i.image,
-        unit_price: i.unitPrice,
-        quantity: i.quantity,
-      })),
-    },
-  });
+export async function placeOrder(
+  sb: SupabaseClient,
+  order: Order,
+  checkoutSessionId?: string,
+): Promise<string> {
+  const payload = {
+    checkout_session_id: checkoutSessionId ?? null,
+    user_id: order.userId ?? null,
+    email: order.email ?? "",
+    customer_name: order.customerName,
+    phone: order.phone,
+    wilaya: order.wilaya,
+    commune: order.commune,
+    address: order.address,
+    notes: order.notes ?? "",
+    payment_method: order.paymentMethod,
+    subtotal: order.subtotal,
+    shipping: order.shipping,
+    total: order.total,
+    items: order.items.map((i) => ({
+      product_id: i.productId,
+      variant_id: i.variantId,
+      name_fr: i.name.fr,
+      name_ar: i.name.ar,
+      size: i.size,
+      color_fr: i.color.fr,
+      color_ar: i.color.ar,
+      image: i.image,
+      unit_price: i.unitPrice,
+      quantity: i.quantity,
+    })),
+  };
+  let { data, error } = await sb.rpc("place_order_with_checkout", { payload });
+
+  if (error?.code === "PGRST202") {
+    ({ data, error } = await sb.rpc("place_order", { payload }));
+    if (!error && checkoutSessionId) {
+      const completion = await sb.rpc("complete_abandoned_checkout", {
+        p_session_id: checkoutSessionId,
+        p_order_reference: (data as { reference: string }).reference,
+      });
+      if (completion.error && completion.error.code !== "PGRST202") throw completion.error;
+    }
+  }
 
   if (error) throw error;
   return (data as { reference: string }).reference;
@@ -442,6 +459,120 @@ export async function fetchProfile(sb: SupabaseClient, userId: string): Promise<
     data: { user },
   } = await sb.auth.getUser();
   return mapProfile(data as ProfileRow, user?.email ?? "");
+}
+
+export async function fetchPixelSettings(sb: SupabaseClient): Promise<PixelSettings> {
+  const { data, error } = await sb
+    .from("store_pixel_settings")
+    .select("meta_pixel_ids, meta_pixel_enabled, tiktok_pixel_ids, tiktok_pixel_enabled")
+    .eq("id", "default")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) {
+    return {
+      metaPixelIds: Array(6).fill(""),
+      metaPixelEnabled: Array(6).fill(false),
+      tiktokPixelIds: Array(4).fill(""),
+      tiktokPixelEnabled: Array(4).fill(false),
+    };
+  }
+  return {
+    metaPixelIds: data.meta_pixel_ids as string[],
+    metaPixelEnabled: data.meta_pixel_enabled as boolean[],
+    tiktokPixelIds: data.tiktok_pixel_ids as string[],
+    tiktokPixelEnabled: data.tiktok_pixel_enabled as boolean[],
+  };
+}
+
+export async function savePixelSettings(sb: SupabaseClient, pixels: PixelSettings) {
+  const { error } = await sb.from("store_pixel_settings").upsert(
+    {
+      id: "default",
+      meta_pixel_ids: pixels.metaPixelIds,
+      meta_pixel_enabled: pixels.metaPixelEnabled,
+      tiktok_pixel_ids: pixels.tiktokPixelIds,
+      tiktok_pixel_enabled: pixels.tiktokPixelEnabled,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "id" },
+  );
+  if (error) throw error;
+}
+
+export async function saveAbandonedCheckout(
+  sb: SupabaseClient,
+  draft: AbandonedCheckout,
+) {
+  const { error } = await sb.rpc("save_abandoned_checkout", {
+    p_session_id: draft.sessionId,
+    p_product_id: draft.productId,
+    p_product_name: draft.productName,
+    p_size: draft.size,
+    p_color: draft.color,
+    p_quantity: draft.quantity,
+    p_value: draft.value,
+    p_contact_consent: draft.contactConsent,
+    p_customer_name: draft.customerName ?? null,
+    p_phone: draft.phone ?? null,
+    p_wilaya: draft.wilaya ?? null,
+    p_commune: draft.commune ?? null,
+  });
+  if (error) throw error;
+}
+
+export async function completeAbandonedCheckout(
+  sb: SupabaseClient,
+  sessionId: string,
+  orderReference: string,
+) {
+  const { error } = await sb.rpc("complete_abandoned_checkout", {
+    p_session_id: sessionId,
+    p_order_reference: orderReference,
+  });
+  if (error) throw error;
+}
+
+interface AbandonedCheckoutRow {
+  session_id: string;
+  product_id: string;
+  product_name: string;
+  size: string;
+  color: string;
+  quantity: number;
+  value: number;
+  contact_consent: boolean;
+  customer_name: string | null;
+  phone: string | null;
+  wilaya: string | null;
+  commune: string | null;
+  created_at: string;
+  expires_at: string;
+}
+
+export async function fetchAbandonedCheckouts(sb: SupabaseClient): Promise<AbandonedCheckout[]> {
+  const { data, error } = await sb
+    .from("abandoned_checkouts")
+    .select("session_id, product_id, product_name, size, color, quantity, value, contact_consent, customer_name, phone, wilaya, commune, created_at, expires_at")
+    .eq("status", "open")
+    .gt("expires_at", new Date().toISOString())
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as AbandonedCheckoutRow[]).map((row) => ({
+    sessionId: row.session_id,
+    productId: row.product_id,
+    productName: row.product_name,
+    size: row.size,
+    color: row.color,
+    quantity: row.quantity,
+    value: row.value,
+    contactConsent: row.contact_consent,
+    customerName: row.customer_name ?? undefined,
+    phone: row.phone ?? undefined,
+    wilaya: row.wilaya ?? undefined,
+    commune: row.commune ?? undefined,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+  }));
 }
 
 // ---------- One-time seed from src/lib/catalog/seed.ts ----------

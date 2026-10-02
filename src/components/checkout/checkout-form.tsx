@@ -18,6 +18,8 @@ import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { formatPrice } from "@/lib/utils";
 import type { Order } from "@/types";
 import { LocaleLink } from "@/components/layout/language-switcher";
+import { useAbandonedCheckout } from "@/lib/orders/use-abandoned-checkout";
+import { trackPurchaseEvent } from "@/components/analytics/analytics-scripts";
 
 export function CheckoutForm() {
   const { locale, dict } = useLocale();
@@ -41,6 +43,7 @@ export function CheckoutForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [placed, setPlaced] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [contactConsent, setContactConsent] = useState(false);
 
   const lines = useMemo(
     () =>
@@ -69,6 +72,21 @@ export function CheckoutForm() {
     shipping: shippingFee,
     total: subtotal + shippingFee,
   };
+  const draftQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  const draftProductName = lines.map((line) => line.product.name[locale] || line.product.name.ar).join("، ");
+  const abandonedCheckout = useAbandonedCheckout({
+    productId: lines.length === 1 ? lines[0].product.id : "cart",
+    productName: lines.length ? draftProductName : (locale === "ar" ? "سلة التسوق" : "Panier"),
+    size: lines.length === 1 ? lines[0].variant.size : "",
+    color: lines.length === 1 ? lines[0].variant.color[locale] : "",
+    quantity: draftQuantity,
+    value: totals.total,
+    contactConsent,
+    customerName: form.name,
+    phone: form.phone,
+    wilaya: form.wilaya,
+    commune: form.commune,
+  });
 
   function validate() {
     const e: Record<string, string> = {};
@@ -86,6 +104,10 @@ export function CheckoutForm() {
     ev.preventDefault();
     if (!validate() || submitting) return;
     setSubmitting(true);
+    const draftSessionId = await abandonedCheckout.saveBeforeSubmit().catch((error) => {
+      console.error("Failed to save checkout draft before order placement", error);
+      return null;
+    });
 
     const order: Order = {
       id: uid("ord"),
@@ -119,7 +141,7 @@ export function CheckoutForm() {
 
     if (isSupabaseConfigured()) {
       try {
-        order.reference = await placeOrderDb(createClient()!, order);
+        order.reference = await placeOrderDb(createClient()!, order, draftSessionId ?? undefined);
         await useCatalogStore.getState().refresh(); // تحديث المخزون المعروض
       } catch (e) {
         const msg = String((e as { message?: string })?.message ?? e);
@@ -147,9 +169,25 @@ export function CheckoutForm() {
       lines.forEach((l) =>
         setVariantStock(l.product.id, l.variant.id, l.variant.stock - l.item.quantity),
       );
-      addOrder(order);
     }
 
+    addOrder(order);
+    trackPurchaseEvent({
+      orderId: order.reference,
+      total: order.total,
+      currency: "DZD",
+      items: order.items.map((item) => ({
+        productId: item.productId,
+        name: item.name.fr || item.name.ar,
+        price: item.unitPrice,
+        quantity: item.quantity,
+      })),
+    });
+    if (draftSessionId && !isSupabaseConfigured()) {
+      await abandonedCheckout.markCompleted(order.reference).catch((error) => {
+        console.error("Failed to mark checkout draft as converted", error);
+      });
+    }
     setSubmitting(false);
     clear();
     setPlaced(order.reference);
@@ -168,9 +206,27 @@ export function CheckoutForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-12 lg:grid-cols-[1fr_320px]">
+    <form
+      onSubmit={onSubmit}
+      onFocusCapture={abandonedCheckout.startTracking}
+      onClickCapture={abandonedCheckout.startTracking}
+      className="grid gap-12 lg:grid-cols-[1fr_320px]"
+    >
       <div className="space-y-5">
         <h2 className="font-serif text-2xl">{dict.checkout.details}</h2>
+        <label className="flex items-start gap-2 rounded-lg border border-line p-3 text-xs leading-5 text-muted">
+          <input
+            type="checkbox"
+            checked={contactConsent}
+            onChange={(event) => setContactConsent(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            {locale === "ar"
+              ? "أوافق اختيارياً على حفظ بيانات الاتصال التي أدخلها لاسترجاع الطلب غير المؤكد. لن تُرسل هذه البيانات إلى منصات الإعلانات."
+              : "J'accepte facultativement la sauvegarde de mes coordonnées pour retrouver ma commande non confirmée. Elles ne seront pas transmises aux plateformes publicitaires."}
+          </span>
+        </label>
         <Field label={dict.checkout.name} error={errors.name}>
           <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </Field>

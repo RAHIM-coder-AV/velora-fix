@@ -10,7 +10,16 @@ import { applyFilters } from "@/lib/catalog/queries";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
 import * as db from "@/lib/supabase/data";
-import type { Category, Filters, Order, OrderStatus, Product, ProductOffer, Review } from "@/types";
+import type {
+  AbandonedCheckout,
+  Category,
+  Filters,
+  Order,
+  OrderStatus,
+  Product,
+  ProductOffer,
+  Review,
+} from "@/types";
 import { uid } from "@/lib/utils";
 
 const initialOrders: Order[] = [
@@ -325,13 +334,35 @@ function saveOrders(orders: Order[]) {
   }
 }
 
+function getStoredAbandonedCheckouts(): AbandonedCheckout[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const saved = localStorage.getItem("velora_abandoned_checkouts");
+    if (!saved) return [];
+    const drafts = JSON.parse(saved) as AbandonedCheckout[];
+    if (!Array.isArray(drafts)) return [];
+    return drafts.filter((draft) => Date.parse(draft.expiresAt) > Date.now());
+  } catch {
+    return [];
+  }
+}
+
+function saveAbandonedCheckouts(drafts: AbandonedCheckout[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("velora_abandoned_checkouts", JSON.stringify(drafts));
+}
+
 interface CatalogState {
   products: Product[];
   categories: Category[];
   orders: Order[];
+  abandonedCheckouts: AbandonedCheckout[];
   reviews: Review[];
   refresh: () => Promise<void>;
   refreshOrders: (all?: boolean) => Promise<void>;
+  refreshAbandonedCheckouts: () => Promise<void>;
+  saveAbandonedCheckout: (draft: AbandonedCheckout) => Promise<void>;
+  completeAbandonedCheckout: (sessionId: string, orderReference: string) => Promise<void>;
   upsertProduct: (product: Product) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   toggleProductActive: (id: string) => void;
@@ -361,6 +392,7 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
   products: getStoredProducts(),
   categories: seedCategories,
   orders: getStoredOrders(),
+  abandonedCheckouts: getStoredAbandonedCheckouts(),
   reviews: seedReviews,
   refresh: async () => {
     const client = sb();
@@ -375,6 +407,38 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     const orders = await db.fetchOrders(client, { all });
     set({ orders });
     saveOrders(orders);
+  },
+  refreshAbandonedCheckouts: async () => {
+    const client = sb();
+    const drafts = client
+      ? await db.fetchAbandonedCheckouts(client)
+      : getStoredAbandonedCheckouts();
+    set({ abandonedCheckouts: drafts });
+  },
+  saveAbandonedCheckout: async (draft) => {
+    const client = sb();
+    if (client) {
+      await db.saveAbandonedCheckout(client, draft);
+      set((state) => ({
+        abandonedCheckouts: [
+          draft,
+          ...state.abandonedCheckouts.filter((item) => item.sessionId !== draft.sessionId),
+        ],
+      }));
+      return;
+    }
+    const updated = [
+      draft,
+      ...get().abandonedCheckouts.filter((item) => item.sessionId !== draft.sessionId),
+    ];
+    set({ abandonedCheckouts: updated });
+    saveAbandonedCheckouts(updated);
+  },
+  completeAbandonedCheckout: async (sessionId, orderReference) => {
+    const client = sb();
+    const updated = get().abandonedCheckouts.filter((item) => item.sessionId !== sessionId);
+    set({ abandonedCheckouts: updated });
+    if (!client) saveAbandonedCheckouts(updated);
   },
   upsertProduct: async (product) => {
     const client = sb();

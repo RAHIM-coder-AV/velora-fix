@@ -25,12 +25,10 @@ export interface NordEtOuestSettings {
 }
 
 export interface PixelSettings {
-  facebookPixel1: string;
-  facebookPixel1Enabled: boolean;
-  facebookPixel2: string;
-  facebookPixel2Enabled: boolean;
-  tiktokPixel: string;
-  tiktokPixelEnabled: boolean;
+  metaPixelIds: string[];
+  metaPixelEnabled: boolean[];
+  tiktokPixelIds: string[];
+  tiktokPixelEnabled: boolean[];
 }
 
 export interface StoreSettings {
@@ -43,4 +41,3 @@ export interface StoreSettings {
   nordEtOuest: NordEtOuestSettings;
   pixels: PixelSettings;
 }
-

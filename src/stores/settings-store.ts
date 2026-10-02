@@ -4,6 +4,10 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { StoreSettings, WilayaDeliveryPrice } from "@/types/settings";
 import { DEFAULT_STORE_SETTINGS } from "@/lib/default-settings";
+import { createClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/configured";
+import * as db from "@/lib/supabase/data";
+import { normalizePixelSettings } from "@/lib/analytics/pixels";
 
 interface SettingsState {
   settings: StoreSettings;
@@ -12,7 +16,8 @@ interface SettingsState {
   bulkUpdateWilayas: (updates: { homePrice?: number; deskPrice?: number; enabled?: boolean }) => void;
   updateEcoTrack: (ecotrack: Partial<StoreSettings["ecotrack"]>) => void;
   updateNordEtOuest: (nordEtOuest: Partial<StoreSettings["nordEtOuest"]>) => void;
-  updatePixels: (pixels: Partial<StoreSettings["pixels"]>) => void;
+  updatePixels: (pixels: StoreSettings["pixels"]) => Promise<void>;
+  refreshPixels: () => Promise<void>;
   getShippingFee: (wilayaValue: string, deliveryType: "home" | "desk") => number;
 }
 
@@ -81,12 +86,21 @@ export const useSettingsStore = create<SettingsState>()(
         }));
       },
 
-      updatePixels: (pixelUpdates) => {
+      updatePixels: async (pixelSettings) => {
+        const pixels = normalizePixelSettings(pixelSettings);
+        const client = isSupabaseConfigured() ? createClient() : null;
+        if (client) await db.savePixelSettings(client, pixels);
         set((state) => ({
-          settings: {
-            ...state.settings,
-            pixels: { ...state.settings.pixels, ...pixelUpdates },
-          },
+          settings: { ...state.settings, pixels },
+        }));
+      },
+
+      refreshPixels: async () => {
+        const client = isSupabaseConfigured() ? createClient() : null;
+        if (!client) return;
+        const pixels = normalizePixelSettings(await db.fetchPixelSettings(client));
+        set((state) => ({
+          settings: { ...state.settings, pixels },
         }));
       },
 
@@ -115,6 +129,18 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "velora_store_settings_v1",
+      version: 2,
+      migrate: (persistedState) => {
+        const persisted = persistedState as Partial<SettingsState> | undefined;
+        return {
+          ...persisted,
+          settings: {
+            ...DEFAULT_STORE_SETTINGS,
+            ...persisted?.settings,
+            pixels: DEFAULT_STORE_SETTINGS.pixels,
+          },
+        } as SettingsState;
+      },
     }
   )
 );

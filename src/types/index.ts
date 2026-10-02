@@ -150,6 +150,23 @@ export interface Order {
   createdAt: string;
 }
 
+export interface AbandonedCheckout {
+  sessionId: string;
+  productId: string;
+  productName: string;
+  size: string;
+  color: string;
+  quantity: number;
+  value: number;
+  contactConsent: boolean;
+  customerName?: string;
+  phone?: string;
+  wilaya?: string;
+  commune?: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
 export interface Filters {
   category?: string;
   minPrice?: number;

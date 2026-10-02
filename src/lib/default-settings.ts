@@ -69,11 +69,9 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     autoSendConfirmed: false,
   },
   pixels: {
-    facebookPixel1: "1587890319488451", // من لقطة شاشتك
-    facebookPixel1Enabled: true,
-    facebookPixel2: "964426659900464",  // من لقطة شاشتك
-    facebookPixel2Enabled: true,
-    tiktokPixel: "",
-    tiktokPixelEnabled: false,
+    metaPixelIds: Array(6).fill(""),
+    metaPixelEnabled: Array(6).fill(false),
+    tiktokPixelIds: Array(4).fill(""),
+    tiktokPixelEnabled: Array(4).fill(false),
   },
 };

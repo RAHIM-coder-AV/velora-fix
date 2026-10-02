@@ -22,11 +22,13 @@ import { useLocale } from "@/providers/locale-provider";
 import { formatPrice } from "@/lib/utils";
 import { totalStock } from "@/lib/catalog/queries";
 import { AdminOrdersTable } from "@/components/admin/admin-orders-table";
+import { AdminAbandonedCheckouts } from "@/components/admin/admin-abandoned-checkouts";
+import { isUndeliveredOrder } from "@/lib/orders/abandoned";
 import { AdminProductsTable } from "@/components/admin/admin-products-table";
 import { AdminSettingsView } from "@/components/admin/admin-settings-view";
 import { cn } from "@/lib/utils";
 
-type AdminTab = "stats" | "orders" | "products" | "settings";
+type AdminTab = "stats" | "orders" | "abandoned" | "products" | "settings";
 
 export default function AdminPage() {
   const { locale, dict } = useLocale();
@@ -39,20 +41,25 @@ export default function AdminPage() {
   const products = useCatalogStore((s) => s.products);
   const categories = useCatalogStore((s) => s.categories);
   const orders = useCatalogStore((s) => s.orders);
+  const abandonedCheckouts = useCatalogStore((s) => s.abandonedCheckouts);
   const upsertProduct = useCatalogStore((s) => s.upsertProduct);
   const deleteProduct = useCatalogStore((s) => s.deleteProduct);
   const toggleProductActive = useCatalogStore((s) => s.toggleProductActive);
   const setOrderStatus = useCatalogStore((s) => s.setOrderStatus);
   const deleteOrder = useCatalogStore((s) => s.deleteOrder);
   const refreshOrders = useCatalogStore((s) => s.refreshOrders);
+  const refreshAbandonedCheckouts = useCatalogStore((s) => s.refreshAbandonedCheckouts);
 
   const [activeTab, setActiveTab] = useState<AdminTab>("orders");
 
   useEffect(() => {
     if (ready && user?.role === "admin") {
       void refreshOrders(true);
+      void refreshAbandonedCheckouts().catch((error) => {
+        console.error("Failed to load abandoned checkout records", error);
+      });
     }
-  }, [ready, user?.role, refreshOrders]);
+  }, [ready, user?.role, refreshOrders, refreshAbandonedCheckouts]);
 
   const totalRevenue = useMemo(
     () => orders.reduce((sum, o) => sum + (o.status !== "cancelled" ? o.total : 0), 0),
@@ -162,6 +169,25 @@ export default function AdminPage() {
                 )}
               >
                 {orders.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("abandoned")}
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-4 py-2 font-bold transition",
+                activeTab === "abandoned"
+                  ? "bg-purple-600 text-white shadow-sm"
+                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              )}
+            >
+              <AlertTriangle size={15} />
+              <span>{locale === "ar" ? "الطلبات المتروكة" : "Abandonnées"}</span>
+              <span className={cn(
+                "rounded-full px-1.5 py-0.2 text-[10px] font-bold",
+                activeTab === "abandoned" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+              )}>
+                {abandonedCheckouts.length + orders.filter((order) => isUndeliveredOrder(order.status)).length}
               </span>
             </button>
 
@@ -290,6 +316,10 @@ export default function AdminPage() {
               onDeleteOrder={(id) => deleteOrder(id)}
             />
           </div>
+        )}
+
+        {activeTab === "abandoned" && (
+          <AdminAbandonedCheckouts drafts={abandonedCheckouts} orders={orders} />
         )}
 
         {activeTab === "products" && (

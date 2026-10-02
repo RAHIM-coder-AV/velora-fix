@@ -11,6 +11,11 @@ import { useCatalogStore } from "@/stores/catalog-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
+import { useAbandonedCheckout } from "@/lib/orders/use-abandoned-checkout";
+import { placeOrder as placeOrderDb } from "@/lib/supabase/data";
+import { createClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/configured";
+import { trackPurchaseEvent } from "@/components/analytics/analytics-scripts";
 
 interface QuickOrderFormProps {
   product: Product;
@@ -82,6 +87,7 @@ export function QuickOrderForm({
   const [wilaya, setWilaya] = useState(ALGERIA_WILAYAS[15]?.nameAr || "16 - الجزائر");
   const [commune, setCommune] = useState("");
   const [address, setAddress] = useState("");
+  const [contactConsent, setContactConsent] = useState(false);
   const [deliveryType, setDeliveryType] = useState<"home" | "desk">("home");
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -93,6 +99,24 @@ export function QuickOrderForm({
   const communes = useMemo(() => getCommunesForWilaya(wilaya), [wilaya]);
 
   const currentPrice = selectedOffer ? selectedOffer.price : product.price;
+  const selectedVariant = product.variants.find(
+    (variant) =>
+      variant.size === selectedSize &&
+      (!selectedColorHex || variant.colorHex.toLowerCase() === selectedColorHex.toLowerCase()),
+  );
+  const abandonedCheckout = useAbandonedCheckout({
+    productId: product.id,
+    productName: product.name[locale] || product.name.ar || product.name.fr,
+    size: selectedSize,
+    color: selectedVariant?.color[locale] || selectedVariant?.color.ar || "",
+    quantity: selectedOffer?.quantity ?? 1,
+    value: currentPrice + shippingFee,
+    contactConsent,
+    customerName,
+    phone,
+    wilaya,
+    commune,
+  });
 
   function validate() {
     const errs: Record<string, string> = {};
@@ -121,6 +145,10 @@ export function QuickOrderForm({
     setSubmitting(true);
 
     try {
+      const draftSessionId = await abandonedCheckout.saveBeforeSubmit().catch((error) => {
+        console.error("Failed to save checkout draft before order placement", error);
+        return null;
+      });
       const qty = selectedOffer ? selectedOffer.quantity : 1;
       const activeVariant = product.variants.find(
         (variant) =>
@@ -171,14 +199,30 @@ export function QuickOrderForm({
         ],
       };
 
-      // إضافة الطلب إلى المخزن المحلي
-      addOrder(newOrder);
-
-      // تقليل كمية المخزون للنسخة
-      if (activeVariant) {
-        setVariantStock(product.id, activeVariant.id, Math.max(0, activeVariant.stock - qty));
+      if (isSupabaseConfigured()) {
+        newOrder.reference = await placeOrderDb(createClient()!, newOrder, draftSessionId ?? undefined);
+        await useCatalogStore.getState().refresh();
+      } else if (activeVariant) {
+        await setVariantStock(product.id, activeVariant.id, Math.max(0, activeVariant.stock - qty));
       }
 
+      addOrder(newOrder);
+      trackPurchaseEvent({
+        orderId: newOrder.reference,
+        total: newOrder.total,
+        currency: "DZD",
+        items: newOrder.items.map((item) => ({
+          productId: item.productId,
+          name: item.name.fr || item.name.ar,
+          price: item.unitPrice,
+          quantity: item.quantity,
+        })),
+      });
+      if (draftSessionId && !isSupabaseConfigured()) {
+        await abandonedCheckout.markCompleted(newOrder.reference).catch((error) => {
+          console.error("Failed to mark checkout draft as converted", error);
+        });
+      }
       toast(locale === "ar" ? "تم تسجيل طلبك بنجاح! سنتصل بك لتأكيده." : "Commande enregistrée avec succès !");
       router.push(`/${locale}/checkout/success?ref=${ref}`);
     } catch {
@@ -201,9 +245,27 @@ export function QuickOrderForm({
         </span>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form
+        onSubmit={handleSubmit}
+        onFocusCapture={abandonedCheckout.startTracking}
+        onClickCapture={abandonedCheckout.startTracking}
+        className="space-y-5"
+      >
         {/* Customer Information Section */}
         <div className="space-y-3">
+          <label className="flex items-start gap-2 rounded-lg border border-zinc-200 p-3 text-[11px] leading-5 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
+            <input
+              type="checkbox"
+              checked={contactConsent}
+              onChange={(event) => setContactConsent(event.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              {locale === "ar"
+                ? "أوافق اختيارياً على حفظ بيانات الاتصال التي أدخلها لاسترجاع الطلب غير المؤكد. لن تُرسل هذه البيانات إلى منصات الإعلانات."
+                : "J'accepte facultativement la sauvegarde de mes coordonnées pour retrouver ma commande non confirmée. Elles ne seront pas transmises aux plateformes publicitaires."}
+            </span>
+          </label>
           <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
             <User size={16} className="text-emerald-600" />
             {locale === "ar" ? "معلومات الزبون" : "Vos coordonnées"}

@@ -16,6 +16,7 @@ import {
   Share2,
 } from "lucide-react";
 import { useSettingsStore } from "@/stores/settings-store";
+import { PixelSettingsEditor } from "@/components/admin/pixel-settings-editor";
 import { useLocale } from "@/providers/locale-provider";
 import { formatPrice } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
@@ -31,7 +32,7 @@ export function AdminSettingsView() {
   const updateNordEtOuest = useSettingsStore((s) => s.updateNordEtOuest);
   const updatePixels = useSettingsStore((s) => s.updatePixels);
 
-  const [activeSubTab, setActiveSubTab] = useState<"delivery" | "ecotrack" | "nord_ouest" | "pixels">("delivery");
+  const [activeSubTab, setActiveSubTab] = useState<"delivery" | "ecotrack" | "nord_ouest" | "pixels" | "pixels_legacy">("delivery");
   const [searchQuery, setSearchQuery] = useState("");
   const [bulkHome, setBulkHome] = useState("");
   const [bulkDesk, setBulkDesk] = useState("");
@@ -50,13 +51,17 @@ export function AdminSettingsView() {
   const [nordAutoSend, setNordAutoSend] = useState(settings.nordEtOuest?.autoSendConfirmed ?? false);
   const [isTestingNord, setIsTestingNord] = useState(false);
 
-  // Pixels Local State
-  const [fbPixel1, setFbPixel1] = useState(settings.pixels.facebookPixel1);
-  const [fbPixel1Enabled, setFbPixel1Enabled] = useState(settings.pixels.facebookPixel1Enabled);
-  const [fbPixel2, setFbPixel2] = useState(settings.pixels.facebookPixel2);
-  const [fbPixel2Enabled, setFbPixel2Enabled] = useState(settings.pixels.facebookPixel2Enabled);
-  const [tiktokPixel, setTiktokPixel] = useState(settings.pixels.tiktokPixel);
+  const [metaPixelIds, setMetaPixelIds] = useState(settings.pixels.metaPixelIds);
+  const [metaPixelEnabled, setMetaPixelEnabled] = useState(settings.pixels.metaPixelEnabled);
+  const [tiktokPixelIds, setTiktokPixelIds] = useState(settings.pixels.tiktokPixelIds);
   const [tiktokPixelEnabled, setTiktokPixelEnabled] = useState(settings.pixels.tiktokPixelEnabled);
+  const [savingPixels, setSavingPixels] = useState(false);
+  const [fbPixel1, setFbPixel1] = useState("");
+  const [fbPixel1Enabled, setFbPixel1Enabled] = useState(false);
+  const [fbPixel2, setFbPixel2] = useState("");
+  const [fbPixel2Enabled, setFbPixel2Enabled] = useState(false);
+  const [tiktokPixel, setTiktokPixel] = useState("");
+  const [legacyTiktokPixelEnabled, setLegacyTiktokPixelEnabled] = useState(false);
 
   // Filter Wilayas
   const filteredWilayas = useMemo(() => {
@@ -169,16 +174,22 @@ export function AdminSettingsView() {
     }
   }
 
-  function handleSavePixels() {
-    updatePixels({
-      facebookPixel1: fbPixel1.trim(),
-      facebookPixel1Enabled: fbPixel1Enabled,
-      facebookPixel2: fbPixel2.trim(),
-      facebookPixel2Enabled: fbPixel2Enabled,
-      tiktokPixel: tiktokPixel.trim(),
-      tiktokPixelEnabled: tiktokPixelEnabled,
-    });
-    toast(locale === "ar" ? "تم حفظ البيكسلات الإعلانية بنجاح!" : "Pixels publicitaires enregistrés !");
+  async function handleSavePixels() {
+    setSavingPixels(true);
+    try {
+      await updatePixels({
+        metaPixelIds: metaPixelIds.map((id) => id.trim()),
+        metaPixelEnabled,
+        tiktokPixelIds: tiktokPixelIds.map((id) => id.trim()),
+        tiktokPixelEnabled,
+      });
+      toast(locale === "ar" ? "تم حفظ معرفات التتبع." : "Pixels enregistrés.");
+    } catch (error) {
+      console.error("Failed to save pixel settings", error);
+      toast(locale === "ar" ? "تعذر الحفظ. تحقق من إعداد قاعدة البيانات وصلاحية المدير." : "Échec de l'enregistrement. Vérifiez la base et les droits.");
+    } finally {
+      setSavingPixels(false);
+    }
   }
 
   function handleApplyBulk() {
@@ -647,7 +658,9 @@ export function AdminSettingsView() {
 
       {/* TAB: META & TIKTOK PIXELS */}
 
-      {activeSubTab === "pixels" && (
+      {activeSubTab === "pixels" && <PixelSettingsEditor />}
+
+      {activeSubTab === "pixels_legacy" && (
         <div className="max-w-2xl space-y-6">
           <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-5 flex items-center gap-3 border-b border-zinc-100 pb-4 dark:border-zinc-800">
@@ -730,12 +743,12 @@ export function AdminSettingsView() {
                   <label className="flex cursor-pointer items-center gap-1.5">
                     <input
                       type="checkbox"
-                      checked={tiktokPixelEnabled}
-                      onChange={(e) => setTiktokPixelEnabled(e.target.checked)}
+                      checked={legacyTiktokPixelEnabled}
+                      onChange={(e) => setLegacyTiktokPixelEnabled(e.target.checked)}
                       className="rounded border-zinc-300 text-purple-600"
                     />
                     <span className="text-[11px] font-medium text-zinc-500">
-                      {tiktokPixelEnabled ? (locale === "ar" ? "مفعل" : "Actif") : (locale === "ar" ? "معطل" : "Inactif")}
+                      {legacyTiktokPixelEnabled ? (locale === "ar" ? "مفعل" : "Actif") : (locale === "ar" ? "معطل" : "Inactif")}
                     </span>
                   </label>
                 </div>
