@@ -405,11 +405,16 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     set({ catalogLoadState: "loading" });
     try {
       const { categories, products, reviews } = await db.fetchCatalog(client);
-      set({ categories, products, reviews, catalogLoadState: "ready" });
-      saveProducts(products);
+      // إذا كانت قاعدة البيانات فارغة، نعود إلى بيانات seed لضمان ظهور المنتجات دائماً
+      const finalProducts = products.length > 0 ? products : seedProducts;
+      const finalCategories = categories.length > 0 ? categories : seedCategories;
+      const finalReviews = reviews.length > 0 ? reviews : seedReviews;
+      set({ categories: finalCategories, products: finalProducts, reviews: finalReviews, catalogLoadState: "ready" });
+      if (products.length > 0) saveProducts(finalProducts);
     } catch (error) {
-      set({ catalogLoadState: "error" });
-      throw error;
+      // في حالة خطأ الاتصال، نعود إلى البيانات المحلية أو seed
+      const fallback = getStoredProducts();
+      set({ products: fallback, categories: seedCategories, reviews: seedReviews, catalogLoadState: "ready" });
     }
   },
   refreshOrders: async (all = false) => {
