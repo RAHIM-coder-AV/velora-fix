@@ -28,6 +28,8 @@ import { AdminProductsTable } from "@/components/admin/admin-products-table";
 import { AdminSettingsView } from "@/components/admin/admin-settings-view";
 import { cn } from "@/lib/utils";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
+import { isPersistedProductId } from "@/lib/catalog/catalog-sync";
+import { errorMessage } from "@/lib/errors";
 
 type AdminTab = "stats" | "orders" | "abandoned" | "products" | "settings";
 
@@ -41,6 +43,8 @@ export default function AdminPage() {
 
   const products = useCatalogStore((s) => s.products);
   const categories = useCatalogStore((s) => s.categories);
+  const catalogLoadState = useCatalogStore((s) => s.catalogLoadState);
+  const refreshCatalog = useCatalogStore((s) => s.refresh);
   const orders = useCatalogStore((s) => s.orders);
   const abandonedCheckouts = useCatalogStore((s) => s.abandonedCheckouts);
   const upsertProduct = useCatalogStore((s) => s.upsertProduct);
@@ -52,6 +56,33 @@ export default function AdminPage() {
   const refreshAbandonedCheckouts = useCatalogStore((s) => s.refreshAbandonedCheckouts);
 
   const [activeTab, setActiveTab] = useState<AdminTab>("orders");
+  const [adminLoginError, setAdminLoginError] = useState("");
+
+  async function loginDemoAdmin() {
+    setAdminLoginError("");
+    try {
+      const error = await login("admin@velora.dz", "admin123");
+      if (error) {
+        setAdminLoginError(
+          locale === "ar"
+            ? "تعذر الدخول بالحساب التجريبي. استخدم حسابًا مسجلًا، وتأكد من تعيين role إلى admin في profiles."
+            : "Le compte démo est indisponible. Utilisez un compte enregistré dont le rôle profiles est admin.",
+        );
+        console.error("Admin demo login failed", error);
+        return;
+      }
+      if (useAuthStore.getState().user?.role !== "admin") {
+        setAdminLoginError(
+          locale === "ar"
+            ? "تم تسجيل الدخول، لكن هذا الحساب ليس مديرًا. يجب تعيين role إلى admin في جدول profiles."
+            : "Connecté, mais ce compte n’est pas administrateur. Définissez role sur admin dans profiles.",
+        );
+      }
+    } catch (error) {
+      console.error("Admin login failed", error);
+      setAdminLoginError(errorMessage(error));
+    }
+  }
 
   useEffect(() => {
     if (ready && user?.role === "admin") {
@@ -95,11 +126,21 @@ export default function AdminPage() {
           </p>
 
           <button
-            onClick={() => void login("admin@velora.dz", "admin123")}
+            onClick={() => void loginDemoAdmin()}
             className="mt-6 w-full rounded-xl bg-purple-600 py-3 text-xs font-bold text-white shadow-lg shadow-purple-600/30 transition hover:bg-purple-700 active:scale-95"
           >
             {locale === "ar" ? "الدخول الفوري كمدير (Demo Admin)" : "Accès direct Admin (Démo)"}
           </button>
+          {adminLoginError ? (
+            <p className="mt-3 text-xs text-red-700 dark:text-red-300" role="alert">
+              {adminLoginError}
+            </p>
+          ) : null}
+          {isSupabaseConfigured() ? (
+            <Link href={`/${locale}/login`} className="mt-4 inline-block text-xs font-semibold text-purple-700 underline dark:text-purple-300">
+              {locale === "ar" ? "تسجيل الدخول بحساب آخر" : "Se connecter avec un autre compte"}
+            </Link>
+          ) : null}
         </div>
       </div>
     );
@@ -339,6 +380,29 @@ export default function AdminPage() {
 
         {activeTab === "products" && (
           <div className="space-y-4">
+            {catalogLoadState === "error" ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300 bg-red-50 p-3 text-xs text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200" role="alert">
+                <span>
+                  {locale === "ar"
+                    ? "تعذر تحميل المنتجات المحفوظة؛ لم تُحذف المنتجات المحلية."
+                    : "Impossible de charger les produits enregistrés ; les produits locaux sont conservés."}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void refreshCatalog().catch((error) => console.error("Catalog refresh failed", error))}
+                  className="rounded-lg border border-red-400 px-3 py-1.5 font-bold"
+                >
+                  {locale === "ar" ? "إعادة المحاولة" : "Réessayer"}
+                </button>
+              </div>
+            ) : null}
+            {isSupabaseConfigured() && products.some((product) => !isPersistedProductId(product.id)) ? (
+              <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100" role="status">
+                {locale === "ar"
+                  ? "تظهر منتجات محلية غير محفوظة في قاعدة البيانات. حفظ المنتج يضيفه إلى القاعدة؛ وحذف منتج محلي يزيله من هذا المتصفح فقط."
+                  : "Certains produits affichés sont locaux et absents de la base. Les enregistrer les ajoute à la base ; supprimer un produit local ne le retire que de ce navigateur."}
+              </p>
+            ) : null}
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-xl font-black text-zinc-900 dark:text-zinc-100">
@@ -355,9 +419,9 @@ export default function AdminPage() {
             <AdminProductsTable
               products={products}
               categories={categories}
-              onUpsertProduct={(prod) => void upsertProduct(prod)}
-              onDeleteProduct={(id) => void deleteProduct(id)}
-              onToggleActive={(id) => toggleProductActive(id)}
+              onUpsertProduct={upsertProduct}
+              onDeleteProduct={deleteProduct}
+              onToggleActive={toggleProductActive}
             />
           </div>
         )}

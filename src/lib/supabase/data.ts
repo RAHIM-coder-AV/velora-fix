@@ -5,11 +5,13 @@ import type {
   OrderItem,
   OrderStatus,
   Product,
+  ProductOffer,
   Profile,
   Review,
   AbandonedCheckout,
 } from "@/types";
 import type { PixelSettings } from "@/types/settings";
+import { categories as seedCategories } from "@/lib/catalog/seed";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -34,8 +36,11 @@ interface ProductRow {
   category_id: string;
   price: number;
   compare_at_price: number | null;
+  sku: string | null;
+  active: boolean;
   featured: boolean;
   is_new: boolean;
+  offers: ProductOffer[] | null;
   created_at: string;
 }
 
@@ -152,10 +157,13 @@ function mapProduct(r: ProductRow, imgs: ImageRow[], vars: VariantRow[]): Produc
     categoryId: r.category_id,
     price: r.price,
     compareAtPrice: r.compare_at_price ?? undefined,
+    sku: r.sku ?? undefined,
     images,
     variants,
     sizes: [...new Set(variants.map((v) => v.size))],
     colors: [...colorMap.values()],
+    offers: r.offers ?? [],
+    active: r.active !== false,
     featured: r.featured,
     isNew: r.is_new,
     rating: 0,
@@ -228,6 +236,9 @@ export async function fetchCatalog(sb: SupabaseClient) {
 
   if (cats.error) throw cats.error;
   if (prods.error) throw prods.error;
+  if (imgs.error) throw imgs.error;
+  if (vars.error) throw vars.error;
+  if (revs.error) throw revs.error;
 
   const imagesByProduct = new Map<string, ImageRow[]>();
   for (const i of (imgs.data ?? []) as ImageRow[]) {
@@ -340,9 +351,38 @@ export async function upsertProduct(
 ): Promise<string> {
   let categoryId = categoryIdOverride ?? p.categoryId;
   if (!UUID_RE.test(categoryId)) {
-    const { data: cats } = await sb.from("categories").select("id").limit(1);
-    categoryId = cats?.[0]?.id ?? "";
-    if (!categoryId) throw new Error("No categories in DB — run the seed first");
+    const seedCategory = seedCategories.find((category) => category.id === categoryId);
+    if (seedCategory) {
+      const { data: existingCategory, error: lookupError } = await sb
+        .from("categories")
+        .select("id")
+        .eq("slug", seedCategory.slug)
+        .maybeSingle();
+      if (lookupError) throw lookupError;
+      if (existingCategory) {
+        categoryId = existingCategory.id as string;
+      } else {
+        const { data: insertedCategory, error: insertError } = await sb
+          .from("categories")
+          .insert({
+            slug: seedCategory.slug,
+            name_fr: seedCategory.name.fr,
+            name_ar: seedCategory.name.ar,
+            description_fr: seedCategory.description.fr,
+            description_ar: seedCategory.description.ar,
+            image: seedCategory.image,
+          })
+          .select("id")
+          .single();
+        if (insertError) throw insertError;
+        categoryId = insertedCategory.id as string;
+      }
+    } else {
+      const { data: cats, error } = await sb.from("categories").select("id").limit(1);
+      if (error) throw error;
+      categoryId = cats?.[0]?.id ?? "";
+      if (!categoryId) throw new Error("No categories in DB — run the seed first");
+    }
   }
 
   const row: Record<string, unknown> = {
@@ -354,16 +394,28 @@ export async function upsertProduct(
     category_id: categoryId,
     price: p.price,
     compare_at_price: p.compareAtPrice ?? null,
+    sku: p.sku ?? null,
+    active: p.active !== false,
     featured: p.featured,
     is_new: p.isNew,
+    offers: p.offers ?? [],
   };
-  if (UUID_RE.test(p.id)) row.id = p.id;
+  const persistedProduct = UUID_RE.test(p.id);
+  if (persistedProduct) row.id = p.id;
 
-  const { data: prod, error } = await sb.from("products").upsert(row).select("id").single();
+  const { data: prod, error } = await sb
+    .from("products")
+    .upsert(row, { onConflict: persistedProduct ? "id" : "slug" })
+    .select("id")
+    .single();
   if (error) throw error;
   const productId = prod.id as string;
 
-  await sb.from("product_images").delete().eq("product_id", productId);
+  const { error: imageDeleteError } = await sb
+    .from("product_images")
+    .delete()
+    .eq("product_id", productId);
+  if (imageDeleteError) throw imageDeleteError;
   if (p.images.length) {
     const { error: e } = await sb.from("product_images").insert(
       p.images.map((img, i) => ({
@@ -425,8 +477,29 @@ export async function upsertProduct(
 }
 
 export async function deleteProduct(sb: SupabaseClient, id: string) {
-  const { error } = await sb.from("products").delete().eq("id", id);
+  const { data, error } = await sb
+    .from("products")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) {
+    throw new Error("Product was not deleted: it may not exist or the current account lacks admin permission.");
+  }
+}
+
+export async function updateProductActive(sb: SupabaseClient, id: string, active: boolean) {
+  const { data, error } = await sb
+    .from("products")
+    .update({ active })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) {
+    throw new Error("Product status was not updated: it may not exist or the current account lacks admin permission.");
+  }
 }
 
 export async function setVariantStock(sb: SupabaseClient, variantId: string, stock: number) {

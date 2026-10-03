@@ -8,13 +8,14 @@ import { useLocale } from "@/providers/locale-provider";
 import { uid } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { reconcileProductVariants } from "@/lib/catalog/product-options";
+import { errorMessage } from "@/lib/errors";
 
 interface ProductEditModalProps {
   product: Product;
   categories: Category[];
   isOpen: boolean;
   onClose: () => void;
-  onSave: (updated: Product) => void;
+  onSave: (updated: Product) => Promise<void>;
 }
 
 export function ProductEditModal({
@@ -54,6 +55,8 @@ export function ProductEditModal({
   const [newSize, setNewSize] = useState("");
   const [newColor, setNewColor] = useState({ ar: "", fr: "", hex: "#111111" });
   const [optionsError, setOptionsError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   function updateProductOptions(sizes: string[], colors: Product["colors"]) {
     setFormData((prev) => ({
@@ -234,9 +237,18 @@ export function ProductEditModal({
     setFormData((prev) => ({ ...prev, offers: updated }));
   }
 
-  function handleSave() {
-    onSave(formData);
-    onClose();
+  async function handleSave() {
+    setSaving(true);
+    setSaveError("");
+    try {
+      await onSave(formData);
+      onClose();
+    } catch (error) {
+      console.error("Failed to save product", error);
+      setSaveError(errorMessage(error));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -821,7 +833,12 @@ export function ProductEditModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-end gap-3 border-t border-zinc-200 px-6 py-4 dark:border-zinc-800">
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-zinc-200 px-6 py-4 dark:border-zinc-800">
+          {saveError ? (
+            <p className="me-auto w-full text-xs text-red-700 dark:text-red-300" role="alert">
+              {saveError}
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={onClose}
@@ -832,9 +849,12 @@ export function ProductEditModal({
           <button
             type="button"
             onClick={handleSave}
-            className="rounded-lg bg-purple-600 px-6 py-2.5 text-xs font-bold text-white shadow-md shadow-purple-600/30 hover:bg-purple-700 active:scale-95"
+            disabled={saving}
+            className="rounded-lg bg-purple-600 px-6 py-2.5 text-xs font-bold text-white shadow-md shadow-purple-600/30 hover:bg-purple-700 active:scale-95 disabled:cursor-wait disabled:opacity-60"
           >
-            {locale === "ar" ? "حفظ التعديلات" : "Enregistrer les modifications"}
+            {saving
+              ? locale === "ar" ? "جارٍ الحفظ..." : "Enregistrement..."
+              : locale === "ar" ? "حفظ التعديلات" : "Enregistrer les modifications"}
           </button>
         </div>
       </div>

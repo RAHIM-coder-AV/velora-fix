@@ -34,6 +34,9 @@ create table if not exists public.products (
   category_id uuid not null references public.categories(id) on delete restrict,
   price integer not null check (price >= 0),
   compare_at_price integer,
+  sku text,
+  active boolean not null default true,
+  offers jsonb not null default '[]'::jsonb check (jsonb_typeof(offers) = 'array'),
   featured boolean not null default false,
   is_new boolean not null default false,
   created_at timestamptz not null default now()
@@ -147,6 +150,8 @@ create or replace function public.is_admin()
 returns boolean
 language sql
 stable
+security definer
+set search_path = ''
 as $$
   select exists (
     select 1 from public.profiles

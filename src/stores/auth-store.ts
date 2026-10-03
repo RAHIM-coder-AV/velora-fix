@@ -96,8 +96,21 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set({ user: demoUser });
       return null;
     }
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    return error ? "error" : null;
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) return error.message;
+    if (data.user) {
+      const profile = await fetchProfile(sb, data.user.id);
+      set({
+        user: profile ?? {
+          id: data.user.id,
+          email: data.user.email ?? "",
+          fullName: (data.user.user_metadata?.full_name as string) ?? "",
+          role: "customer",
+          createdAt: data.user.created_at,
+        },
+      });
+    }
+    return null;
   },
   register: async ({ email, password, fullName, phone }) => {
     const sb = createClient();

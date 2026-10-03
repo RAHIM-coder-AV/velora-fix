@@ -7,6 +7,7 @@ import {
   reviews as seedReviews,
 } from "@/lib/catalog/seed";
 import { applyFilters } from "@/lib/catalog/queries";
+import { isPersistedProductId, mergeCatalogProducts } from "@/lib/catalog/catalog-sync";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
 import * as db from "@/lib/supabase/data";
@@ -292,7 +293,7 @@ function getStoredProducts(): Product[] {
     const saved = localStorage.getItem("velora_products");
     if (saved) {
       const parsed = JSON.parse(saved) as Product[];
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch {
     // ignore
@@ -366,7 +367,7 @@ interface CatalogState {
   completeAbandonedCheckout: (sessionId: string, orderReference: string) => Promise<void>;
   upsertProduct: (product: Product) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
-  toggleProductActive: (id: string) => void;
+  toggleProductActive: (id: string) => Promise<void>;
   updateProductOffers: (productId: string, offers: ProductOffer[]) => void;
   addOrder: (order: Order) => void;
   updateOrder: (order: Order) => void;
@@ -405,16 +406,17 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     set({ catalogLoadState: "loading" });
     try {
       const { categories, products, reviews } = await db.fetchCatalog(client);
-      // إذا كانت قاعدة البيانات فارغة، نعود إلى بيانات seed لضمان ظهور المنتجات دائماً
-      const finalProducts = products.length > 0 ? products : seedProducts;
-      const finalCategories = categories.length > 0 ? categories : seedCategories;
-      const finalReviews = reviews.length > 0 ? reviews : seedReviews;
-      set({ categories: finalCategories, products: finalProducts, reviews: finalReviews, catalogLoadState: "ready" });
-      if (products.length > 0) saveProducts(finalProducts);
+      const finalProducts = mergeCatalogProducts(products, get().products);
+      set((state) => ({
+        categories: categories.length ? categories : state.categories,
+        products: finalProducts,
+        reviews: reviews.length ? reviews : state.reviews,
+        catalogLoadState: "ready",
+      }));
+      saveProducts(finalProducts);
     } catch (error) {
-      // في حالة خطأ الاتصال، نعود إلى البيانات المحلية أو seed
-      const fallback = getStoredProducts();
-      set({ products: fallback, categories: seedCategories, reviews: seedReviews, catalogLoadState: "ready" });
+      set({ catalogLoadState: "error" });
+      throw error;
     }
   },
   refreshOrders: async (all = false) => {
@@ -473,7 +475,7 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
   },
   deleteProduct: async (id) => {
     const client = sb();
-    if (client) {
+    if (client && isPersistedProductId(id)) {
       await db.deleteProduct(client, id);
       await get().refresh();
       return;
@@ -482,10 +484,17 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     set({ products: updated });
     saveProducts(updated);
   },
-  toggleProductActive: (id) => {
-    const updated = get().products.map((p) =>
-      p.id === id ? { ...p, active: p.active === false ? true : false } : p
-    );
+  toggleProductActive: async (id) => {
+    const product = get().products.find((item) => item.id === id);
+    if (!product) return;
+    const active = product.active === false;
+    const client = sb();
+    if (client && isPersistedProductId(id)) {
+      await db.updateProductActive(client, id, active);
+      await get().refresh();
+      return;
+    }
+    const updated = get().products.map((p) => (p.id === id ? { ...p, active } : p));
     set({ products: updated });
     saveProducts(updated);
   },

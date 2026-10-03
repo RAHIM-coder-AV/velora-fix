@@ -2,7 +2,7 @@ import { categories as seedCategories, products as seedProducts, reviews as seed
 import type { Category, Filters, Product, Review } from "@/types";
 
 export function applyFilters(list: Product[], filters: Filters = {}) {
-  let next = [...list];
+  let next = list.filter((product) => product.active !== false);
 
   if (filters.category) {
     next = next.filter((p) => p.categoryId === filters.category || p.categoryId === categoryIdFromSlug(filters.category!));
@@ -64,7 +64,9 @@ export function getSeedReviews(productId: string): Review[] {
 }
 
 export function relatedProducts(product: Product, all: Product[], limit = 4) {
-  return all.filter((p) => p.id !== product.id && p.categoryId === product.categoryId).slice(0, limit);
+  return all
+    .filter((p) => p.active !== false && p.id !== product.id && p.categoryId === product.categoryId)
+    .slice(0, limit);
 }
 
 export function totalStock(product: Product) {

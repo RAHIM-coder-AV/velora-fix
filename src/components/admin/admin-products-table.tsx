@@ -10,13 +10,15 @@ import { formatPrice } from "@/lib/utils";
 import { totalStock } from "@/lib/catalog/queries";
 import { ProductEditModal } from "@/components/admin/product-edit-modal";
 import { cn } from "@/lib/utils";
+import { toast } from "@/components/ui/toast";
+import { errorMessage } from "@/lib/errors";
 
 interface AdminProductsTableProps {
   products: Product[];
   categories: Category[];
-  onUpsertProduct: (product: Product) => void;
-  onDeleteProduct: (productId: string) => void;
-  onToggleActive: (productId: string) => void;
+  onUpsertProduct: (product: Product) => Promise<void>;
+  onDeleteProduct: (productId: string) => Promise<void>;
+  onToggleActive: (productId: string) => Promise<void>;
 }
 
 export function AdminProductsTable({
@@ -29,6 +31,46 @@ export function AdminProductsTable({
   const { locale } = useLocale();
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+
+  async function deleteProduct(product: Product) {
+    if (deletingProductId) return;
+    const confirmed = window.confirm(
+      locale === "ar"
+        ? `هل تريد حذف «${product.name.ar || product.name.fr}»؟`
+        : `Supprimer « ${product.name.fr || product.name.ar} » ?`,
+    );
+    if (!confirmed) return;
+
+    setDeletingProductId(product.id);
+    try {
+      await onDeleteProduct(product.id);
+      toast(locale === "ar" ? "تم حذف المنتج." : "Produit supprimé.");
+    } catch (error) {
+      console.error("Failed to delete product", error);
+      toast(
+        locale === "ar"
+          ? `تعذر حذف المنتج: ${errorMessage(error)}`
+          : `Suppression impossible : ${errorMessage(error)}`,
+      );
+    } finally {
+      setDeletingProductId(null);
+    }
+  }
+
+  async function toggleProduct(product: Product) {
+    try {
+      await onToggleActive(product.id);
+      toast(locale === "ar" ? "تم تحديث حالة المنتج." : "Statut du produit mis à jour.");
+    } catch (error) {
+      console.error("Failed to update product status", error);
+      toast(
+        locale === "ar"
+          ? `تعذر تحديث حالة المنتج: ${errorMessage(error)}`
+          : `Mise à jour impossible : ${errorMessage(error)}`,
+      );
+    }
+  }
 
   const filteredProducts = products.filter((p) => {
     const q = searchQuery.trim().toLowerCase();
@@ -239,7 +281,7 @@ export function AdminProductsTable({
                     <td className="py-3.5 px-3 text-center">
                       <button
                         type="button"
-                        onClick={() => onToggleActive(p.id)}
+                        onClick={() => void toggleProduct(p)}
                         className={cn(
                           "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
                           isActive ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700"
@@ -269,7 +311,8 @@ export function AdminProductsTable({
 
                         <button
                           type="button"
-                          onClick={() => onDeleteProduct(p.id)}
+                          onClick={() => void deleteProduct(p)}
+                          disabled={deletingProductId === p.id}
                           className="rounded-lg p-1.5 text-zinc-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30"
                           title={locale === "ar" ? "حذف" : "Supprimer"}
                         >
@@ -292,8 +335,9 @@ export function AdminProductsTable({
           categories={categories}
           isOpen={Boolean(editingProduct)}
           onClose={() => setEditingProduct(null)}
-          onSave={(updated) => {
-            onUpsertProduct(updated);
+          onSave={async (updated) => {
+            await onUpsertProduct(updated);
+            toast(locale === "ar" ? "تم حفظ المنتج." : "Produit enregistré.");
             setEditingProduct(null);
           }}
         />

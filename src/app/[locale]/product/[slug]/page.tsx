@@ -37,7 +37,7 @@ export default function ProductPage() {
     );
   }
 
-  if (!product) {
+  if (!product || product.active === false) {
     return (
       <Container className="py-20 text-center">
         <p className="font-serif text-3xl">{dict.catalog.empty}</p>
