@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -12,34 +11,36 @@ import {
   ExternalLink,
   ShieldCheck,
   LogOut,
-  Users,
   Settings,
   Bell,
+  Palette,
+  Warehouse,
+  ChevronLeft,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCatalogStore } from "@/stores/catalog-store";
 import { useLocale } from "@/providers/locale-provider";
 import { formatPrice } from "@/lib/utils";
-import { totalStock } from "@/lib/catalog/queries";
 import { AdminOrdersTable } from "@/components/admin/admin-orders-table";
 import { AdminAbandonedCheckouts } from "@/components/admin/admin-abandoned-checkouts";
 import { isUndeliveredOrder } from "@/lib/orders/abandoned";
 import { AdminProductsTable } from "@/components/admin/admin-products-table";
+import { AdminHomepageEditor } from "@/components/admin/admin-homepage-editor";
 import { AdminSettingsView } from "@/components/admin/admin-settings-view";
 import { cn } from "@/lib/utils";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
-import { isPersistedProductId } from "@/lib/catalog/catalog-sync";
+import { getLocalProductsToImport } from "@/lib/catalog/catalog-sync";
+import { products as seedProducts } from "@/lib/catalog/seed";
 import { errorMessage } from "@/lib/errors";
 
 type AdminTab = "stats" | "orders" | "abandoned" | "products" | "settings";
 
 export default function AdminPage() {
-  const { locale, dict } = useLocale();
+  const { locale } = useLocale();
   const ready = useAuthStore((s) => s.ready);
   const user = useAuthStore((s) => s.user);
   const login = useAuthStore((s) => s.login);
   const logout = useAuthStore((s) => s.logout);
-  const router = useRouter();
 
   const products = useCatalogStore((s) => s.products);
   const categories = useCatalogStore((s) => s.categories);
@@ -49,7 +50,9 @@ export default function AdminPage() {
   const abandonedCheckouts = useCatalogStore((s) => s.abandonedCheckouts);
   const upsertProduct = useCatalogStore((s) => s.upsertProduct);
   const deleteProduct = useCatalogStore((s) => s.deleteProduct);
+  const deleteAllProducts = useCatalogStore((s) => s.deleteAllProducts);
   const toggleProductActive = useCatalogStore((s) => s.toggleProductActive);
+  const importLocalProducts = useCatalogStore((s) => s.importLocalProducts);
   const setOrderStatus = useCatalogStore((s) => s.setOrderStatus);
   const deleteOrder = useCatalogStore((s) => s.deleteOrder);
   const refreshOrders = useCatalogStore((s) => s.refreshOrders);
@@ -103,11 +106,6 @@ export default function AdminPage() {
     [orders]
   );
 
-  const lowStockCount = useMemo(
-    () => products.filter((p) => totalStock(p) < 5).length,
-    [products]
-  );
-
   // If user is not yet logged in as admin, provide 1-click demo admin login
   if (ready && (!user || user.role !== "admin")) {
     return (
@@ -147,7 +145,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 pb-20 dark:bg-zinc-950">
+    <div className="dark min-h-screen bg-[#111111] pb-20 text-zinc-100">
       {!isSupabaseConfigured() && (
         <div className="mx-auto max-w-7xl px-3 pt-3 sm:px-6" role="alert">
           <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
@@ -162,143 +160,158 @@ export default function AdminPage() {
           </div>
         </div>
       )}
-      {/* Admin Top Header Navigation */}
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/95">
-        <div className="mx-auto flex min-w-0 max-w-7xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-3 sm:flex-nowrap sm:px-6">
-          {/* Brand & Store Link */}
-          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-600 font-bold text-white shadow-md shadow-purple-600/30">
-              V
+      <aside
+        className={cn(
+          "fixed inset-y-0 z-40 hidden w-64 flex-col border-zinc-800 bg-[#191719] lg:flex",
+          locale === "ar" ? "right-0 border-l" : "left-0 border-r",
+        )}
+      >
+        <div className="flex items-center gap-3 border-b border-zinc-800 px-5 py-5">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-purple-300/40 bg-purple-500/15 font-serif text-xl text-purple-300">V</div>
+          <div className="min-w-0">
+            <p className="truncate font-serif text-lg font-semibold tracking-[0.16em]">VELORA</p>
+            <p className="text-[10px] text-zinc-500">{locale === "ar" ? "إدارة المتجر" : "Administration"}</p>
+          </div>
+        </div>
+        <div className="border-b border-zinc-800 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-400/20 text-sm font-bold text-purple-200">
+              {(user?.fullName || "V").slice(0, 1)}
             </div>
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-x-2">
-                <span className="truncate font-serif text-sm font-bold sm:text-base">Velora Admin</span>
-                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
-                  لوحة التحكم
-                </span>
-              </div>
-              <p className="truncate text-[10px] text-zinc-500">
-                {user?.fullName || "Abderrahim kouriche"}
-              </p>
+              <p className="truncate text-sm font-medium">{user?.fullName || "Velora Admin"}</p>
+              <p className="text-[11px] text-zinc-500">{locale === "ar" ? "مدير المتجر" : "Administrateur"}</p>
             </div>
           </div>
+          <Link
+            href={`/${locale}`}
+            target="_blank"
+            className="mt-4 flex min-h-10 items-center justify-center gap-2 rounded-full bg-purple-400/20 px-3 text-xs font-semibold text-purple-200 transition hover:bg-purple-400/30"
+          >
+            <ExternalLink size={14} />
+            {locale === "ar" ? "زيارة المتجر" : "Visiter la boutique"}
+          </Link>
+        </div>
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4 text-sm">
+          {([
+            { tab: "stats", label: locale === "ar" ? "الرئيسية" : "Accueil", icon: LayoutDashboard },
+            { tab: "orders", label: locale === "ar" ? "الطلبات" : "Commandes", icon: ShoppingBag, count: orders.length },
+            { tab: "abandoned", label: locale === "ar" ? "الطلبات المتروكة" : "Commandes abandonnées", icon: AlertTriangle, count: abandonedCheckouts.length + orders.filter((order) => isUndeliveredOrder(order.status)).length },
+            { tab: "products", label: locale === "ar" ? "المنتجات" : "Produits", icon: Package, count: products.length },
+            { tab: "products", label: locale === "ar" ? "تصميم المتجر" : "Design du magasin", icon: Palette, anchor: "homepage-editor" },
+            { tab: "products", label: locale === "ar" ? "إدارة المخزون" : "Stock", icon: Warehouse },
+            { tab: "settings", label: locale === "ar" ? "الإعدادات" : "Paramètres", icon: Settings },
+          ] as const).map((item, index) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.tab && (item.tab !== "products" || index === 3);
+            return (
+              <button
+                key={`${item.label}-${index}`}
+                type="button"
+                onClick={() => {
+                  setActiveTab(item.tab);
+                  if ("anchor" in item) {
+                    window.setTimeout(() => document.getElementById(item.anchor)?.scrollIntoView({ behavior: "smooth" }), 80);
+                  }
+                }}
+                className={cn(
+                  "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-start transition",
+                  isActive
+                    ? "bg-purple-700/60 font-semibold text-white"
+                    : "text-zinc-300 hover:bg-zinc-800 hover:text-white",
+                )}
+              >
+                <Icon size={17} className={isActive ? "text-purple-200" : "text-zinc-400"} />
+                <span className="flex-1">{item.label}</span>
+                {"count" in item && (
+                  <span className="rounded-full bg-purple-400/25 px-2 py-0.5 text-[10px] text-purple-200">{item.count}</span>
+                )}
+                {isActive && <ChevronLeft size={14} className="text-purple-200" />}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="border-t border-zinc-800 p-3">
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm text-zinc-400 transition hover:bg-red-950/40 hover:text-red-300"
+          >
+            <LogOut size={16} />
+            {locale === "ar" ? "تسجيل الخروج" : "Déconnexion"}
+          </button>
+        </div>
+      </aside>
 
-          {/* Quick Actions */}
-          <div className="flex shrink-0 items-center gap-2">
-            <Link
-              href={`/${locale}`}
-              target="_blank"
-              className="flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700 shadow-xs transition hover:bg-zinc-50 hover:text-purple-600 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"
-            >
-              <ExternalLink size={13} />
-              <span>{locale === "ar" ? "زيارة المتجر" : "Voir le magasin"}</span>
-            </Link>
-
-            <button
-              onClick={() => void logout()}
-              className="rounded-xl border border-zinc-200 p-2 text-zinc-500 transition hover:bg-red-50 hover:text-red-600 dark:border-zinc-800 dark:hover:bg-red-950/30"
-              title={locale === "ar" ? "تسجيل الخروج" : "Déconnexion"}
-            >
-              <LogOut size={15} />
-            </button>
+      <div className={cn("min-h-screen", locale === "ar" ? "lg:pr-64" : "lg:pl-64")}>
+        <header className="sticky top-0 z-30 border-b border-zinc-800 bg-[#141414]/95 backdrop-blur-md">
+          <div className="flex min-h-[68px] items-center justify-between gap-3 px-4 sm:px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-500/20 font-serif text-lg text-purple-200 lg:hidden">V</div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-zinc-100">{user?.fullName || "Velora Admin"}</p>
+                <p className="text-[11px] text-zinc-500">{locale === "ar" ? "لوحة إدارة المتجر" : "Espace de gestion"}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href={`/${locale}`} target="_blank" className="hidden min-h-10 items-center gap-2 rounded-full border border-zinc-700 px-4 text-xs font-semibold text-zinc-300 hover:border-purple-400 hover:text-white sm:flex">
+                <ExternalLink size={14} />
+                {locale === "ar" ? "زيارة المتجر" : "Voir la boutique"}
+              </Link>
+              <button type="button" onClick={() => void logout()} className="rounded-lg border border-zinc-700 p-2 text-zinc-400 hover:bg-red-950/40 hover:text-red-300 lg:hidden" aria-label={locale === "ar" ? "تسجيل الخروج" : "Déconnexion"}>
+                <LogOut size={16} />
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* Navigation Tabs Bar (Matching Screenshot Style) */}
-        <div className="mx-auto flex max-w-7xl overflow-x-auto px-4 sm:px-6">
-          <nav className="flex w-max min-w-full gap-2 py-1 text-xs">
-            <button
-              onClick={() => setActiveTab("orders")}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-4 py-2 font-bold transition",
-                activeTab === "orders"
-                  ? "bg-purple-600 text-white shadow-sm"
-                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-              )}
-            >
-              <ShoppingBag size={15} />
-              <span>{locale === "ar" ? "الطلبات" : "Commandes"}</span>
-              <span
-                className={cn(
-                  "rounded-full px-1.5 py-0.2 text-[10px] font-bold",
-                  activeTab === "orders" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
-                )}
-              >
-                {orders.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("abandoned")}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-4 py-2 font-bold transition",
-                activeTab === "abandoned"
-                  ? "bg-purple-600 text-white shadow-sm"
-                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-              )}
-            >
-              <AlertTriangle size={15} />
-              <span>{locale === "ar" ? "الطلبات المتروكة" : "Abandonnées"}</span>
-              <span className={cn(
-                "rounded-full px-1.5 py-0.2 text-[10px] font-bold",
-                activeTab === "abandoned" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-              )}>
-                {abandonedCheckouts.length + orders.filter((order) => isUndeliveredOrder(order.status)).length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("products")}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-4 py-2 font-bold transition",
-                activeTab === "products"
-                  ? "bg-purple-600 text-white shadow-sm"
-                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-              )}
-            >
-              <Package size={15} />
-              <span>{locale === "ar" ? "المنتجات وتعديل الأسعار" : "Produits & Prix"}</span>
-              <span
-                className={cn(
-                  "rounded-full px-1.5 py-0.2 text-[10px] font-bold",
-                  activeTab === "products" ? "bg-white/20 text-white" : "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                )}
-              >
-                {products.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("stats")}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-4 py-2 font-bold transition",
-                activeTab === "stats"
-                  ? "bg-purple-600 text-white shadow-sm"
-                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-              )}
-            >
-              <LayoutDashboard size={15} />
-              <span>{locale === "ar" ? "الإحصائيات" : "Tableau de bord"}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("settings")}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-4 py-2 font-bold transition",
-                activeTab === "settings"
-                  ? "bg-purple-600 text-white shadow-sm"
-                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-              )}
-            >
-              <Settings size={15} />
-              <span>{locale === "ar" ? "الإعدادات والربط" : "Paramètres & Intégrations"}</span>
-            </button>
+          <nav className="flex gap-1 overflow-x-auto border-t border-zinc-800 px-3 py-2 lg:hidden">
+            {([
+              { tab: "stats", label: locale === "ar" ? "الرئيسية" : "Accueil", icon: LayoutDashboard },
+              { tab: "orders", label: locale === "ar" ? "الطلبات" : "Commandes", icon: ShoppingBag },
+              { tab: "abandoned", label: locale === "ar" ? "المتروكة" : "Abandonnées", icon: AlertTriangle },
+              { tab: "products", label: locale === "ar" ? "المنتجات" : "Produits", icon: Package },
+              { tab: "settings", label: locale === "ar" ? "الإعدادات" : "Paramètres", icon: Settings },
+            ] as const).map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.tab}
+                  type="button"
+                  onClick={() => setActiveTab(item.tab)}
+                  className={cn(
+                    "flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-xs font-semibold",
+                    activeTab === item.tab ? "bg-purple-700 text-white" : "text-zinc-400 hover:bg-zinc-800",
+                  )}
+                >
+                  <Icon size={14} />
+                  {item.label}
+                </button>
+              );
+            })}
           </nav>
-        </div>
-      </header>
+        </header>
 
       {/* Main Content Area */}
-      <main className="mx-auto min-w-0 max-w-7xl px-3 pt-4 sm:px-6 sm:pt-6">
+      <main className="mx-auto min-w-0 max-w-[1800px] px-3 pt-4 sm:px-5 sm:pt-6 xl:px-8">
+        <div className="mb-5 rounded-xl border border-zinc-800 bg-[#181818] px-4 py-4 sm:mb-6 sm:px-6 sm:py-5">
+          <h1 className="text-lg font-bold text-purple-300 sm:text-xl">
+            {activeTab === "orders"
+              ? locale === "ar" ? "إدارة الطلبات" : "Gestion des commandes"
+              : activeTab === "abandoned"
+                ? locale === "ar" ? "الطلبات المتروكة" : "Commandes abandonnées"
+                : activeTab === "products"
+                  ? locale === "ar" ? "إدارة المنتجات وتصميم المتجر" : "Produits et design du magasin"
+                  : activeTab === "settings"
+                    ? locale === "ar" ? "إعدادات المتجر" : "Paramètres du magasin"
+                    : locale === "ar" ? "الرئيسية والإحصائيات" : "Accueil et statistiques"}
+          </h1>
+          <p className="mt-1 text-xs text-zinc-400 sm:text-sm">
+            {activeTab === "orders"
+              ? locale === "ar" ? "مراقبة وإدارة طلبات الزبائن في متجرك" : "Suivez et gérez les commandes de votre boutique"
+              : activeTab === "products"
+                ? locale === "ar" ? "إدارة المنتجات والفئات والمخزون وتخصيص واجهة المتجر" : "Gérez les produits, catégories, stocks et contenu de la boutique"
+                : locale === "ar" ? "نظرة واضحة على نشاط المتجر وإعداداته" : "Vue d’ensemble de l’activité et des paramètres"}
+          </p>
+        </div>
         {/* Quick KPI Overview Cards */}
         <div className="mb-5 grid grid-cols-2 gap-2 sm:mb-6 sm:gap-4 sm:grid-cols-4">
           <div className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xs sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
@@ -353,19 +366,6 @@ export default function AdminPage() {
         {/* View Switcher based on Tab */}
         {activeTab === "orders" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-xl font-black text-zinc-900 dark:text-zinc-100">
-                  {locale === "ar" ? "إدارة الطلبات" : "Gestion des commandes"}
-                </h1>
-                <p className="text-xs text-zinc-500">
-                  {locale === "ar"
-                    ? "متابعة وتأكيد طلبات الزبائن وتغيير حالات التوصيل"
-                    : "Suivi des commandes en direct, expédition et confirmation"}
-                </p>
-              </div>
-            </div>
-
             <AdminOrdersTable
               orders={orders}
               onStatusChange={(id, status) => void setOrderStatus(id, status)}
@@ -396,11 +396,11 @@ export default function AdminPage() {
                 </button>
               </div>
             ) : null}
-            {isSupabaseConfigured() && products.some((product) => !isPersistedProductId(product.id)) ? (
+            {isSupabaseConfigured() && getLocalProductsToImport(products, seedProducts).length > 0 ? (
               <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100" role="status">
                 {locale === "ar"
-                  ? "تظهر منتجات محلية غير محفوظة في قاعدة البيانات. حفظ المنتج يضيفه إلى القاعدة؛ وحذف منتج محلي يزيله من هذا المتصفح فقط."
-                  : "Certains produits affichés sont locaux et absents de la base. Les enregistrer les ajoute à la base ; supprimer un produit local ne le retire que de ce navigateur."}
+                  ? `توجد ${getLocalProductsToImport(products, seedProducts).length} منتجات مخصصة محلية لم تُحفظ في قاعدة البيانات. يمكنك استيرادها بأمان من زر الاستيراد؛ المنتجات التجريبية والمكررة مستبعدة.`
+                  : `${getLocalProductsToImport(products, seedProducts).length} produit(s) personnalisé(s) sont locaux et absents de la base. Utilisez l’import sécurisé ; les exemples et doublons sont exclus.`}
               </p>
             ) : null}
             <div className="flex items-center justify-between">
@@ -416,11 +416,15 @@ export default function AdminPage() {
               </div>
             </div>
 
+            <AdminHomepageEditor products={products} categories={categories} />
             <AdminProductsTable
               products={products}
               categories={categories}
+              localImportCount={getLocalProductsToImport(products, seedProducts).length}
+              onImportLocalProducts={importLocalProducts}
               onUpsertProduct={upsertProduct}
               onDeleteProduct={deleteProduct}
+              onDeleteAllProducts={deleteAllProducts}
               onToggleActive={toggleProductActive}
             />
           </div>
@@ -478,6 +482,7 @@ export default function AdminPage() {
 
         {activeTab === "settings" && <AdminSettingsView />}
       </main>
+      </div>
     </div>
   );
 }

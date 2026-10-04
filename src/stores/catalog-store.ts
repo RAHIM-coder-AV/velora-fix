@@ -7,7 +7,12 @@ import {
   reviews as seedReviews,
 } from "@/lib/catalog/seed";
 import { applyFilters } from "@/lib/catalog/queries";
-import { isPersistedProductId, mergeCatalogProducts } from "@/lib/catalog/catalog-sync";
+import {
+  getLocalProductsToImport,
+  isPersistedProductId,
+  mergeCatalogProducts,
+  removeSeedProducts,
+} from "@/lib/catalog/catalog-sync";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
 import * as db from "@/lib/supabase/data";
@@ -288,17 +293,19 @@ const initialOrders: Order[] = [
 ];
 
 function getStoredProducts(): Product[] {
-  if (typeof window === "undefined") return seedProducts;
+  if (typeof window === "undefined") return [];
   try {
     const saved = localStorage.getItem("velora_products");
     if (saved) {
       const parsed = JSON.parse(saved) as Product[];
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return removeSeedProducts(parsed, seedProducts);
+      }
     }
   } catch {
     // ignore
   }
-  return seedProducts;
+  return [];
 }
 
 function getStoredOrders(): Order[] {
@@ -366,8 +373,10 @@ interface CatalogState {
   saveAbandonedCheckout: (draft: AbandonedCheckout) => Promise<void>;
   completeAbandonedCheckout: (sessionId: string, orderReference: string) => Promise<void>;
   upsertProduct: (product: Product) => Promise<void>;
-  deleteProduct: (id: string) => Promise<void>;
+  deleteProduct: (id: string) => Promise<"deleted" | "removed-local">;
+  deleteAllProducts: () => Promise<{ deletedFromDatabase: number; removedLocally: number }>;
   toggleProductActive: (id: string) => Promise<void>;
+  importLocalProducts: () => Promise<ImportLocalProductsResult>;
   updateProductOffers: (productId: string, offers: ProductOffer[]) => void;
   addOrder: (order: Order) => void;
   updateOrder: (order: Order) => void;
@@ -386,6 +395,12 @@ interface CatalogState {
   setVariantStock: (productId: string, variantId: string, stock: number) => Promise<void>;
   listProducts: (filters?: Filters) => Product[];
   getProduct: (slug: string) => Product | undefined;
+}
+
+export interface ImportLocalProductsResult {
+  imported: number;
+  skipped: number;
+  failed: Array<{ slug: string; message: string }>;
 }
 
 const sb = () => (isSupabaseConfigured() ? createClient() : null);
@@ -461,7 +476,16 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
   upsertProduct: async (product) => {
     const client = sb();
     if (client) {
-      await db.upsertProduct(client, product);
+      if (isPersistedProductId(product.id)) {
+        await db.upsertProduct(client, product);
+      } else {
+        const inserted = await db.insertProductIfMissing(client, product);
+        if (!inserted) {
+          throw new Error(
+            "A product with this URL already exists. Reload the catalog and edit the saved product instead of replacing it with a local copy.",
+          );
+        }
+      }
       await get().refresh();
       return;
     }
@@ -473,16 +497,81 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     set({ products: updated });
     saveProducts(updated);
   },
+  importLocalProducts: async () => {
+    const client = sb();
+    if (!client) {
+      throw new Error("Supabase is not configured; local products cannot be shared with customers.");
+    }
+
+    const candidates = getLocalProductsToImport(get().products, seedProducts);
+    let imported = 0;
+    let skipped = 0;
+    const failed: Array<{ slug: string; message: string }> = [];
+
+    for (const product of candidates) {
+      try {
+        const inserted = await db.insertProductIfMissing(client, product);
+        if (inserted) imported += 1;
+        else skipped += 1;
+      } catch (error) {
+        failed.push({
+          slug: product.slug,
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
+
+    if (imported > 0) {
+      try {
+        await get().refresh();
+      } catch (error) {
+        failed.push({
+          slug: "catalog-refresh",
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
+
+    return { imported, skipped, failed };
+  },
   deleteProduct: async (id) => {
     const client = sb();
     if (client && isPersistedProductId(id)) {
       await db.deleteProduct(client, id);
       await get().refresh();
-      return;
+      return "deleted";
     }
     const updated = get().products.filter((p) => p.id !== id);
     set({ products: updated });
     saveProducts(updated);
+    return "removed-local";
+  },
+  deleteAllProducts: async () => {
+    const products = get().products;
+    const client = sb();
+    if (client && get().catalogLoadState !== "ready") {
+      throw new Error("The database catalog must finish loading successfully before deleting all products.");
+    }
+    const persistedIds = [...new Set(products.filter((product) => isPersistedProductId(product.id)).map((product) => product.id))];
+    const removedLocally = products.length - persistedIds.length;
+    let deletedFromDatabase = 0;
+
+    if (client && persistedIds.length > 0) {
+      deletedFromDatabase = await db.deleteProducts(client, persistedIds);
+    }
+
+    set({ products: [] });
+    saveProducts([]);
+    if (client) {
+      await get().refresh();
+      if (get().products.length > 0) {
+        throw new Error(
+          "Some products remain in the database catalog. Verify admin permissions and reload before retrying.",
+        );
+      }
+    }
+
+    return { deletedFromDatabase, removedLocally };
   },
   toggleProductActive: async (id) => {
     const product = get().products.find((item) => item.id === id);

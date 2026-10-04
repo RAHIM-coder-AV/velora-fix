@@ -16,3 +16,30 @@ export function mergeCatalogProducts(
   );
   return [...persistedProducts, ...cachedOnlyProducts];
 }
+
+export function removeSeedProducts(products: Product[], seedProducts: Product[]): Product[] {
+  const seedIds = new Set(seedProducts.map((product) => product.id));
+  const seedSlugs = new Set(seedProducts.map((product) => product.slug));
+  return products.filter(
+    (product) => !seedIds.has(product.id) && !seedSlugs.has(product.slug),
+  );
+}
+
+export function getLocalProductsToImport(
+  products: Product[],
+  seedProducts: Product[],
+): Product[] {
+  const seedIds = new Set(seedProducts.map((product) => product.id));
+  const seedSlugs = new Set(seedProducts.map((product) => product.slug));
+  const seenSlugs = new Set<string>();
+
+  return products.filter((product) => {
+    if (isPersistedProductId(product.id) || seedIds.has(product.id) || seedSlugs.has(product.slug)) {
+      return false;
+    }
+    const slug = product.slug.trim();
+    if (!slug || seenSlugs.has(slug)) return false;
+    seenSlugs.add(slug);
+    return true;
+  });
+}

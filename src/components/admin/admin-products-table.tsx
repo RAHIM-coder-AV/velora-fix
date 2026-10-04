@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Edit2, Trash2, Eye, Plus, Search, Tag, DollarSign, Check, X } from "lucide-react";
+import { Edit2, Trash2, Eye, Plus, Search, Tag, Upload, DollarSign, Check, X } from "lucide-react";
 import type { Product, Category } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
 import { formatPrice } from "@/lib/utils";
@@ -12,13 +12,18 @@ import { ProductEditModal } from "@/components/admin/product-edit-modal";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
+import { isPersistedProductId } from "@/lib/catalog/catalog-sync";
+import type { ImportLocalProductsResult } from "@/stores/catalog-store";
 
 interface AdminProductsTableProps {
   products: Product[];
   categories: Category[];
   onUpsertProduct: (product: Product) => Promise<void>;
-  onDeleteProduct: (productId: string) => Promise<void>;
+  onDeleteProduct: (productId: string) => Promise<"deleted" | "removed-local">;
+  onDeleteAllProducts: () => Promise<{ deletedFromDatabase: number; removedLocally: number }>;
   onToggleActive: (productId: string) => Promise<void>;
+  localImportCount: number;
+  onImportLocalProducts: () => Promise<ImportLocalProductsResult>;
 }
 
 export function AdminProductsTable({
@@ -26,12 +31,91 @@ export function AdminProductsTable({
   categories,
   onUpsertProduct,
   onDeleteProduct,
+  onDeleteAllProducts,
   onToggleActive,
+  localImportCount,
+  onImportLocalProducts,
 }: AdminProductsTableProps) {
   const { locale } = useLocale();
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
+
+  async function deleteAllProducts() {
+    if (deletingAll || products.length === 0) return;
+    const confirmationPhrase = locale === "ar" ? "حذف جميع المنتجات" : "SUPPRIMER TOUS LES PRODUITS";
+    const confirmed = window.confirm(
+      locale === "ar"
+        ? `سيتم حذف ${products.length} منتج نهائيًا من الكتالوج المتاح، بما في ذلك المنتجات المحفوظة محليًا. لن تُحذف الطلبات السابقة. ستُحذف المنتجات المرتبطة من قاعدة البيانات فقط عند نجاح صلاحية المدير.`
+        : `${products.length} produit(s) seront supprimés définitivement du catalogue chargé, y compris les produits locaux. Les commandes antérieures seront conservées. La suppression distante exige le rôle administrateur.`,
+    );
+    if (!confirmed) return;
+    const typedPhrase = window.prompt(
+      locale === "ar"
+        ? `للتأكيد اكتب العبارة التالية كما هي: ${confirmationPhrase}`
+        : `Pour confirmer, saisissez exactement : ${confirmationPhrase}`,
+    );
+    if (typedPhrase !== confirmationPhrase) return;
+
+    setDeletingAll(true);
+    try {
+      const result = await onDeleteAllProducts();
+      toast(
+        locale === "ar"
+          ? `تم الإفراغ: حُذف ${result.deletedFromDatabase} من قاعدة البيانات وأزيل ${result.removedLocally} محليًا.`
+          : `Catalogue vidé : ${result.deletedFromDatabase} suppression(s) distante(s), ${result.removedLocally} locale(s).`,
+      );
+    } catch (error) {
+      console.error("Failed to delete all products", error);
+      toast(
+        locale === "ar"
+          ? `تعذر حذف جميع المنتجات: ${errorMessage(error)}`
+          : `Suppression totale impossible : ${errorMessage(error)}`,
+      );
+    } finally {
+      setDeletingAll(false);
+    }
+  }
+
+  async function importLocalProducts() {
+    if (importing || localImportCount === 0) return;
+    const confirmed = window.confirm(
+      locale === "ar"
+        ? `سيتم استيراد ${localImportCount} منتج مخصص غير موجود في قاعدة البيانات. المنتجات التجريبية والمكررة مستبعدة، ولن يتم استبدال أي منتج موجود. هل تريد المتابعة؟`
+        : `${localImportCount} produit(s) personnalisé(s) absent(s) de la base seront ajoutés. Les exemples et doublons sont exclus, et aucun produit existant ne sera remplacé. Continuer ?`,
+    );
+    if (!confirmed) return;
+
+    setImporting(true);
+    try {
+      const result = await onImportLocalProducts();
+      if (result.failed.length) {
+        const firstFailure = result.failed[0];
+        toast(
+          locale === "ar"
+            ? `أُضيف ${result.imported}، وتُخطّي ${result.skipped}؛ فشل ${result.failed.length}. ${firstFailure.slug}: ${firstFailure.message}`
+            : `${result.imported} ajouté(s), ${result.skipped} ignoré(s), ${result.failed.length} échec(s). ${firstFailure.slug}: ${firstFailure.message}`,
+        );
+      } else {
+        toast(
+          locale === "ar"
+            ? `اكتمل الاستيراد: أُضيف ${result.imported}، وتُخطّي ${result.skipped} دون استبدال بيانات.`
+            : `Import terminé : ${result.imported} ajouté(s), ${result.skipped} ignoré(s), sans remplacement.`,
+        );
+      }
+    } catch (error) {
+      console.error("Failed to import local products", error);
+      toast(
+        locale === "ar"
+          ? `تعذر استيراد المنتجات: ${errorMessage(error)}`
+          : `Import impossible : ${errorMessage(error)}`,
+      );
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function deleteProduct(product: Product) {
     if (deletingProductId) return;
@@ -44,8 +128,16 @@ export function AdminProductsTable({
 
     setDeletingProductId(product.id);
     try {
-      await onDeleteProduct(product.id);
-      toast(locale === "ar" ? "تم حذف المنتج." : "Produit supprimé.");
+      const result = await onDeleteProduct(product.id);
+      toast(
+        result === "removed-local"
+          ? locale === "ar"
+            ? "أزيل المنتج المحلي من هذا المتصفح فقط؛ لم يُحذف من قاعدة البيانات."
+            : "Produit local retiré de ce navigateur uniquement ; il n’a pas été supprimé de la base."
+          : locale === "ar"
+            ? "تم حذف المنتج."
+            : "Produit supprimé.",
+      );
     } catch (error) {
       console.error("Failed to delete product", error);
       toast(
@@ -61,7 +153,15 @@ export function AdminProductsTable({
   async function toggleProduct(product: Product) {
     try {
       await onToggleActive(product.id);
-      toast(locale === "ar" ? "تم تحديث حالة المنتج." : "Statut du produit mis à jour.");
+      toast(
+        isPersistedProductId(product.id)
+          ? locale === "ar"
+            ? "تم تحديث حالة المنتج."
+            : "Statut du produit mis à jour."
+          : locale === "ar"
+            ? "تغيرت الحالة في هذا المتصفح فقط؛ احفظ المنتج لمزامنتها."
+            : "Statut modifié dans ce navigateur uniquement ; enregistrez le produit pour le synchroniser.",
+      );
     } catch (error) {
       console.error("Failed to update product status", error);
       toast(
@@ -99,9 +199,38 @@ export function AdminProductsTable({
         </div>
 
         {/* Add Product Button */}
-        <button
-          type="button"
-          onClick={() => {
+        <div className="flex flex-wrap gap-2">
+          {products.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void deleteAllProducts()}
+              disabled={deletingAll}
+              className="flex items-center gap-2 rounded-xl border border-red-300 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-900 transition hover:bg-red-100 disabled:cursor-wait disabled:opacity-60"
+            >
+              <Trash2 size={15} />
+              <span>{deletingAll ? (locale === "ar" ? "جارٍ الحذف..." : "Suppression...") : (locale === "ar" ? "حذف جميع المنتجات" : "Tout supprimer")}</span>
+            </button>
+          )}
+          {localImportCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => void importLocalProducts()}
+              disabled={importing}
+              className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-950 transition hover:bg-amber-100 disabled:cursor-wait disabled:opacity-60 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+            >
+              <Upload size={15} />
+              <span>
+                {importing
+                  ? locale === "ar" ? "جارٍ الاستيراد..." : "Importation..."
+                  : locale === "ar"
+                    ? `حفظ ${localImportCount} منتج محلي في المتجر`
+                    : `Enregistrer ${localImportCount} produit(s) dans la boutique`}
+              </span>
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => {
             const newProd: Product = {
               id: `p_${Date.now().toString(36)}`,
               slug: `product-${Date.now().toString(36)}`,
@@ -161,7 +290,8 @@ export function AdminProductsTable({
         >
           <Plus size={16} />
           <span>{locale === "ar" ? "إضافة منتج جديد" : "Ajouter un produit"}</span>
-        </button>
+          </button>
+        </div>
       </div>
 
       {/* Table Container */}

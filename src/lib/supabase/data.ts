@@ -344,14 +344,14 @@ export async function updateOrderStatus(sb: SupabaseClient, id: string, status: 
 }
 
 // ---------- Products (admin) ----------
-export async function upsertProduct(
+async function resolveProductCategoryId(
   sb: SupabaseClient,
-  p: Product,
+  categoryId: string,
   categoryIdOverride?: string,
 ): Promise<string> {
-  let categoryId = categoryIdOverride ?? p.categoryId;
-  if (!UUID_RE.test(categoryId)) {
-    const seedCategory = seedCategories.find((category) => category.id === categoryId);
+  let resolvedCategoryId = categoryIdOverride ?? categoryId;
+  if (!UUID_RE.test(resolvedCategoryId)) {
+    const seedCategory = seedCategories.find((category) => category.id === resolvedCategoryId);
     if (seedCategory) {
       const { data: existingCategory, error: lookupError } = await sb
         .from("categories")
@@ -360,7 +360,7 @@ export async function upsertProduct(
         .maybeSingle();
       if (lookupError) throw lookupError;
       if (existingCategory) {
-        categoryId = existingCategory.id as string;
+        resolvedCategoryId = existingCategory.id as string;
       } else {
         const { data: insertedCategory, error: insertError } = await sb
           .from("categories")
@@ -375,16 +375,19 @@ export async function upsertProduct(
           .select("id")
           .single();
         if (insertError) throw insertError;
-        categoryId = insertedCategory.id as string;
+        resolvedCategoryId = insertedCategory.id as string;
       }
     } else {
       const { data: cats, error } = await sb.from("categories").select("id").limit(1);
       if (error) throw error;
-      categoryId = cats?.[0]?.id ?? "";
-      if (!categoryId) throw new Error("No categories in DB — run the seed first");
+      resolvedCategoryId = cats?.[0]?.id ?? "";
+      if (!resolvedCategoryId) throw new Error("No categories in DB — run the seed first");
     }
   }
+  return resolvedCategoryId;
+}
 
+function productDatabaseRow(p: Product, categoryId: string): Record<string, unknown> {
   const row: Record<string, unknown> = {
     slug: p.slug,
     name_fr: p.name.fr,
@@ -402,14 +405,19 @@ export async function upsertProduct(
   };
   const persistedProduct = UUID_RE.test(p.id);
   if (persistedProduct) row.id = p.id;
+  return row;
+}
 
-  const { data: prod, error } = await sb
-    .from("products")
-    .upsert(row, { onConflict: persistedProduct ? "id" : "slug" })
+async function saveProductRelations(
+  sb: SupabaseClient,
+  productId: string,
+  p: Product,
+): Promise<void> {
+  const { data: currentVariants, error: variantsError } = await sb
+    .from("product_variants")
     .select("id")
-    .single();
-  if (error) throw error;
-  const productId = prod.id as string;
+    .eq("product_id", productId);
+  if (variantsError) throw variantsError;
 
   const { error: imageDeleteError } = await sb
     .from("product_images")
@@ -428,12 +436,6 @@ export async function upsertProduct(
     );
     if (e) throw e;
   }
-
-  const { data: currentVariants, error: variantsError } = await sb
-    .from("product_variants")
-    .select("id")
-    .eq("product_id", productId);
-  if (variantsError) throw variantsError;
 
   const currentVariantIds = new Set(
     ((currentVariants ?? []) as Array<{ id: string }>).map((variant) => variant.id),
@@ -472,8 +474,102 @@ export async function upsertProduct(
     const { error } = await sb.from("product_variants").insert(newRows);
     if (error) throw error;
   }
+}
 
+async function assertProductManagementSchema(sb: SupabaseClient): Promise<void> {
+  const { error } = await sb
+    .from("products")
+    .select("id, sku, active, offers")
+    .limit(0);
+  if (!error) return;
+  if (error.code === "42703") {
+    throw new Error(
+      "Product management schema is not installed. Apply supabase/migrations/0003_product_admin_fields.sql before saving or importing products.",
+    );
+  }
+  throw error;
+}
+
+export async function upsertProduct(
+  sb: SupabaseClient,
+  p: Product,
+  categoryIdOverride?: string,
+): Promise<string> {
+  await assertProductManagementSchema(sb);
+  const categoryId = await resolveProductCategoryId(sb, p.categoryId, categoryIdOverride);
+  const row = productDatabaseRow(p, categoryId);
+  const persistedProduct = UUID_RE.test(p.id);
+  const { data: prod, error } = await sb
+    .from("products")
+    .upsert(row, { onConflict: persistedProduct ? "id" : "slug" })
+    .select("id")
+    .single();
+  if (error) throw error;
+  const productId = prod.id as string;
+  await saveProductRelations(sb, productId, p);
   return productId;
+}
+
+export async function insertProductIfMissing(
+  sb: SupabaseClient,
+  p: Product,
+): Promise<boolean> {
+  await assertProductManagementSchema(sb);
+  const { data: existing, error: lookupError } = await sb
+    .from("products")
+    .select("id")
+    .eq("slug", p.slug)
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+  if (existing) return false;
+
+  const categoryId = await resolveProductCategoryId(sb, p.categoryId);
+  const row = productDatabaseRow(p, categoryId);
+  delete row.id;
+
+  const { data: inserted, error: insertError } = await sb
+    .from("products")
+    .insert(row)
+    .select("id")
+    .single();
+  if (insertError) {
+    if (insertError.code === "23505") {
+      const { data: duplicate, error } = await sb
+        .from("products")
+        .select("id")
+        .eq("slug", p.slug)
+        .maybeSingle();
+      if (error) throw error;
+      if (duplicate) return false;
+    }
+    throw insertError;
+  }
+
+  const productId = inserted.id as string;
+  try {
+    await saveProductRelations(sb, productId, p);
+  } catch (error) {
+    try {
+      const { data: removedProduct, error: cleanupError } = await sb
+        .from("products")
+        .delete()
+        .eq("id", productId)
+        .select("id")
+        .maybeSingle();
+      if (cleanupError) {
+        throw new Error(`Related product data failed and the product row could not be cleaned up: ${cleanupError.message}`);
+      }
+      if (!removedProduct) {
+        throw new Error("The inserted product row remains because database permissions prevented cleanup.");
+      }
+    } catch (cleanupError) {
+      throw new Error(
+        `Related product data failed; cleanup also failed (${cleanupError instanceof Error ? cleanupError.message : "unknown cleanup error"}). Original error: ${error instanceof Error ? error.message : "unknown error"}`,
+      );
+    }
+    throw error;
+  }
+  return true;
 }
 
 export async function deleteProduct(sb: SupabaseClient, id: string) {
@@ -489,7 +585,28 @@ export async function deleteProduct(sb: SupabaseClient, id: string) {
   }
 }
 
+export async function deleteProducts(sb: SupabaseClient, ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const invalidId = ids.find((id) => !UUID_RE.test(id));
+  if (invalidId) throw new Error("Bulk product deletion received an invalid product ID.");
+  const uniqueIds = [...new Set(ids)];
+  const { data, error } = await sb
+    .from("products")
+    .delete()
+    .in("id", uniqueIds)
+    .select("id");
+  if (error) throw error;
+  const deleted = data?.length ?? 0;
+  if (deleted !== uniqueIds.length) {
+    throw new Error(
+      `Only ${deleted} of ${uniqueIds.length} database products were deleted. Check admin permissions and refresh the catalog.`,
+    );
+  }
+  return deleted;
+}
+
 export async function updateProductActive(sb: SupabaseClient, id: string, active: boolean) {
+  await assertProductManagementSchema(sb);
   const { data, error } = await sb
     .from("products")
     .update({ active })

@@ -5,13 +5,9 @@ import "../globals.css";
 import { isLocale, localeDir, locales, type Locale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/dictionaries";
 import { LocaleProvider } from "@/providers/locale-provider";
-import { SessionProvider } from "@/providers/session-provider";
-import { Navbar } from "@/components/layout/navbar";
-import { Footer } from "@/components/layout/footer";
-import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
+import { StoreChrome } from "@/components/layout/store-chrome";
 import { ToastHost } from "@/components/ui/toast";
 import { AnalyticsScripts } from "@/components/analytics/analytics-scripts";
-import { MarketingConsentBanner } from "@/components/analytics/marketing-consent-banner";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -68,15 +64,9 @@ export default async function LocaleLayout({
     >
       <body className="flex min-h-full flex-col" dir={dir}>
         <LocaleProvider locale={locale} dict={dict}>
-          <Navbar />
-          <main className="min-w-0 flex-1">
-            <SessionProvider>{children}</SessionProvider>
-          </main>
-          <Footer />
-          <MobileBottomNav />
+          <StoreChrome>{children}</StoreChrome>
           <ToastHost />
           <AnalyticsScripts />
-          <MarketingConsentBanner />
         </LocaleProvider>
       </body>
     </html>
