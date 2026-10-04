@@ -103,6 +103,10 @@ create table if not exists public.orders (
   subtotal integer not null,
   shipping integer not null,
   total integer not null,
+  delivery_company text,
+  tracking_code text,
+  delivery_dispatched_at timestamptz,
+  label_url text,
   created_at timestamptz not null default now()
 );
 

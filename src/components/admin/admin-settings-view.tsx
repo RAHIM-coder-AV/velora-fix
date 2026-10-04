@@ -99,37 +99,30 @@ export function AdminSettingsView() {
   async function handleTestEcoTrack() {
     setIsTestingEcoTrack(true);
     try {
-      const res = await fetch("/api/delivery/dispatch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          company: "ecotrack",
-          token: ecotrackToken.trim(),
-          baseUrl: ecotrackUrl.trim(),
-          orders: [
-            {
-              id: "test",
-              reference: "TEST-01",
-              customerName: "عميل تجريبي",
-              phone: "0555000000",
-              wilaya: "16 - الجزائر",
-              commune: "الجزائر الوسطى",
-              address: "حي أول ماي",
-              total: 2500,
-              shipping: 400,
-              items: [{ name: "فحص الاتصال التجريبي", quantity: 1 }],
-            },
-          ],
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast(locale === "ar" ? "✅ الاتصال مع خادم EcoTrack يعمل بنجاح!" : "Connexion EcoTrack réussie !");
-      } else {
-        toast(locale === "ar" ? `تنبيه: ${data.error || "خطأ في الرد"}` : `Erreur: ${data.error}`);
+      const token = ecotrackToken.trim();
+      const url = new URL(ecotrackUrl.trim());
+      if (
+        !ecotrackEnabled ||
+        token.length < 10 ||
+        token.startsWith("demo_") ||
+        url.protocol !== "https:" ||
+        url.username ||
+        url.password ||
+        url.port ||
+        url.search ||
+        url.hash ||
+        (url.hostname !== "ecotrack.dz" && !url.hostname.endsWith(".ecotrack.dz"))
+      ) {
+        toast(locale === "ar"
+          ? "تحقق من تفعيل الربط، والرمز الحقيقي، ورابط EcoTrack الآمن."
+          : "Vérifiez l'activation, le jeton réel et l'URL EcoTrack sécurisée.");
+        return;
       }
+      toast(locale === "ar"
+        ? "الإعدادات مكتملة. هذا الفحص لا يتصل بحسابك ولا ينشئ شحنة؛ تأكد من الربط برفع طلب حقيقي."
+        : "Configuration complète. Aucun appel ni envoi n'est effectué par ce contrôle.");
     } catch {
-      toast(locale === "ar" ? "فشل الاتصال بخادم EcoTrack" : "Échec de connexion");
+      toast(locale === "ar" ? "رابط EcoTrack غير صالح." : "URL EcoTrack invalide.");
     } finally {
       setIsTestingEcoTrack(false);
     }
@@ -138,37 +131,31 @@ export function AdminSettingsView() {
   async function handleTestNord() {
     setIsTestingNord(true);
     try {
-      const res = await fetch("/api/delivery/dispatch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          company: "nord_ouest",
-          token: nordToken.trim(),
-          baseUrl: nordUrl.trim(),
-          orders: [
-            {
-              id: "test",
-              reference: "TEST-02",
-              customerName: "عميل تجريبي",
-              phone: "0555000000",
-              wilaya: "31 - وهران",
-              commune: "وهران",
-              address: "السانية",
-              total: 3000,
-              shipping: 500,
-              items: [{ name: "فحص الاتصال التجريبي", quantity: 1 }],
-            },
-          ],
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast(locale === "ar" ? "✅ الاتصال مع خادم Nord Et Ouest يعمل بنجاح!" : "Connexion Nord Et Ouest réussie !");
-      } else {
-        toast(locale === "ar" ? `تنبيه: ${data.error || "خطأ في الرد"}` : `Erreur: ${data.error}`);
+      const token = nordToken.trim();
+      const url = new URL(nordUrl.trim());
+      if (
+        !nordEnabled ||
+        token.length < 10 ||
+        token.startsWith("demo_") ||
+        url.protocol !== "https:" ||
+        url.username ||
+        url.password ||
+        url.port ||
+        url.search ||
+        url.hash ||
+        (url.hostname !== "nordetouest.com" &&
+          !url.hostname.endsWith(".nordetouest.com"))
+      ) {
+        toast(locale === "ar"
+          ? "تحقق من تفعيل الربط، والرمز الحقيقي، ورابط Nord Et Ouest الآمن."
+          : "Vérifiez l'activation, le jeton réel et l'URL Nord Et Ouest sécurisée.");
+        return;
       }
+      toast(locale === "ar"
+        ? "الإعدادات مكتملة. هذا الفحص لا يتصل بحسابك ولا ينشئ شحنة؛ تأكد من الربط برفع طلب حقيقي."
+        : "Configuration complète. Aucun appel ni envoi n'est effectué par ce contrôle.");
     } catch {
-      toast(locale === "ar" ? "فشل الاتصال بخادم Nord Et Ouest" : "Échec de connexion");
+      toast(locale === "ar" ? "رابط Nord Et Ouest غير صالح." : "URL Nord Et Ouest invalide.");
     } finally {
       setIsTestingNord(false);
     }
@@ -519,7 +506,7 @@ export function AdminSettingsView() {
                   ) : (
                     <CheckCircle2 size={14} />
                   )}
-                  <span>{locale === "ar" ? "اختبار الاتصال" : "Tester la connexion"}</span>
+                  <span>{locale === "ar" ? "فحص الإعدادات" : "Vérifier la configuration"}</span>
                 </button>
                 <button
                   type="button"
@@ -640,7 +627,7 @@ export function AdminSettingsView() {
                   ) : (
                     <CheckCircle2 size={14} />
                   )}
-                  <span>{locale === "ar" ? "اختبار الاتصال" : "Tester la connexion"}</span>
+                  <span>{locale === "ar" ? "فحص الإعدادات" : "Vérifier la configuration"}</span>
                 </button>
                 <button
                   type="button"

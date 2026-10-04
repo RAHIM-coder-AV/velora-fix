@@ -116,6 +116,10 @@ interface OrderRow {
   subtotal: number;
   shipping: number;
   total: number;
+  delivery_company: string | null;
+  tracking_code: string | null;
+  delivery_dispatched_at: string | null;
+  label_url: string | null;
   created_at: string;
   order_items?: OrderItemRow[];
 }
@@ -220,6 +224,10 @@ const mapOrder = (r: OrderRow): Order => ({
   subtotal: r.subtotal,
   shipping: r.shipping,
   total: r.total,
+  deliveryCompany: r.delivery_company ?? undefined,
+  trackingCode: r.tracking_code ?? undefined,
+  deliveryDispatchedAt: r.delivery_dispatched_at ?? undefined,
+  labelUrl: r.label_url ?? undefined,
   createdAt: r.created_at,
   items: (r.order_items ?? []).map(mapOrderItem),
 });
@@ -340,6 +348,30 @@ export async function fetchOrders(sb: SupabaseClient, opts: { all?: boolean } = 
 
 export async function updateOrderStatus(sb: SupabaseClient, id: string, status: OrderStatus) {
   const { error } = await sb.from("orders").update({ status }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateOrderDelivery(
+  sb: SupabaseClient,
+  id: string,
+  delivery: {
+    deliveryCompany: string;
+    trackingCode: string;
+    status: OrderStatus;
+    dispatchedAt: string;
+    labelUrl?: string;
+  },
+) {
+  const { error } = await sb
+    .from("orders")
+    .update({
+      delivery_company: delivery.deliveryCompany,
+      tracking_code: delivery.trackingCode,
+      status: delivery.status,
+      delivery_dispatched_at: delivery.dispatchedAt,
+      label_url: delivery.labelUrl ?? null,
+    })
+    .eq("id", id);
   if (error) throw error;
 }
 

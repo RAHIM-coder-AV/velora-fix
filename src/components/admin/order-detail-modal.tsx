@@ -45,7 +45,6 @@ export function OrderDetailModal({
   const [dispatchResult, setDispatchResult] = useState<{
     company: string;
     trackingCode: string;
-    isSimulation?: boolean;
   } | null>(null);
 
   async function handleDispatch(company: "ecotrack" | "nord_ouest") {
@@ -54,11 +53,11 @@ export function OrderDetailModal({
     const cfg = company === "ecotrack" ? ecotrack : nordEtOuest;
     const companyLabel = company === "ecotrack" ? "EcoTrack" : "Nord Et Ouest";
 
-    if (!cfg?.token) {
+    if (!cfg?.enabled || !cfg.token) {
       toast(
         locale === "ar"
-          ? `يرجى إدخال رمز API Token لـ ${companyLabel} في الإعدادات أولاً!`
-          : `Veuillez configurer le Token ${companyLabel} dans les paramètres !`
+          ? `فعّل الربط وأدخل رمز API حقيقيًا لـ ${companyLabel} في الإعدادات أولاً.`
+          : `Activez l'intégration et configurez un vrai jeton API ${companyLabel}.`
       );
       return;
     }
@@ -99,26 +98,30 @@ export function OrderDetailModal({
       const data = await res.json();
       const result = data.results?.[0];
 
-      if (result?.success) {
+      if (res.ok && result?.success && typeof result.trackingCode === "string") {
         const tracking = result.trackingCode;
         setDispatchResult({
           company: companyLabel,
           trackingCode: tracking,
-          isSimulation: result.isSimulation,
         });
-        // Update order in store with tracking info
-        updateOrderDelivery(order.id, {
-          deliveryCompany: company,
-          trackingCode: tracking,
-          status: "shipped",
-          labelUrl: result.labelUrl,
-        });
-        onStatusChange("shipped");
-        toast(
-          locale === "ar"
-            ? `✅ تم رفع الطلب إلى ${companyLabel}! كود التتبع: ${tracking}${result.isSimulation ? " (تجريبي)" : ""}`
-            : `✅ Commande envoyée à ${companyLabel} ! Tracking: ${tracking}`
-        );
+        try {
+          await updateOrderDelivery(order.id, {
+            deliveryCompany: company,
+            trackingCode: tracking,
+            status: "shipped",
+            labelUrl: result.labelUrl,
+          });
+          onStatusChange("shipped");
+          toast(
+            locale === "ar"
+              ? `تم إنشاء الشحنة لدى ${companyLabel}. كود التتبع: ${tracking}`
+              : `Expédiée via ${companyLabel}. Suivi : ${tracking}`
+          );
+        } catch {
+          toast(locale === "ar"
+            ? `أُنشئت الشحنة (${tracking}) لكن تعذر حفظ بياناتها في قاعدة البيانات. لا تعاود الرفع كي لا تتكرر.`
+            : `Expédiée (${tracking}), mais la sauvegarde a échoué. Ne relancez pas l'envoi.`);
+        }
       } else {
         toast(
           locale === "ar"
@@ -126,7 +129,7 @@ export function OrderDetailModal({
             : `❌ Erreur: ${result?.error || data.error}`
         );
       }
-    } catch (err: any) {
+    } catch {
       toast(
         locale === "ar"
           ? `فشل الاتصال بخادم ${companyLabel}`
@@ -242,8 +245,8 @@ export function OrderDetailModal({
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
                   {locale === "ar"
-                    ? `✅ تم رفع الطلب إلى ${dispatchResult.company} بنجاح!${dispatchResult.isSimulation ? " (وضع تجريبي)" : ""}`
-                    : `✅ Envoyé à ${dispatchResult.company} !${dispatchResult.isSimulation ? " (simulation)" : ""}`}
+                    ? `تم إنشاء الشحنة لدى ${dispatchResult.company}.`
+                    : `Expédiée via ${dispatchResult.company}.`}
                 </p>
                 <p className="mt-0.5 text-[11px] text-emerald-700 dark:text-emerald-400">
                   {locale === "ar" ? "كود التتبع: " : "Code suivi: "}

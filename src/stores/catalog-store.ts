@@ -28,6 +28,8 @@ import type {
 } from "@/types";
 import { uid } from "@/lib/utils";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const initialOrders: Order[] = [
   {
     id: "ord_01",
@@ -391,7 +393,7 @@ interface CatalogState {
       status?: OrderStatus;
       labelUrl?: string;
     }
-  ) => void;
+  ) => Promise<void>;
   setVariantStock: (productId: string, variantId: string, stock: number) => Promise<void>;
   listProducts: (filters?: Filters) => Product[];
   getProduct: (slug: string) => Product | undefined;
@@ -623,21 +625,33 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     set({ orders: updated });
     saveOrders(updated);
   },
-  updateOrderDelivery: (id, deliveryData) => {
+  updateOrderDelivery: async (id, deliveryData) => {
+    const dispatchedAt = new Date().toISOString();
+    const status = deliveryData.status || "shipped";
     const updated = get().orders.map((o) =>
       o.id === id
         ? {
             ...o,
             deliveryCompany: deliveryData.deliveryCompany,
             trackingCode: deliveryData.trackingCode,
-            status: deliveryData.status || "shipped",
-            deliveryDispatchedAt: new Date().toISOString(),
+            status,
+            deliveryDispatchedAt: dispatchedAt,
             labelUrl: deliveryData.labelUrl || o.labelUrl,
           }
         : o
     );
     set({ orders: updated });
     saveOrders(updated);
+    const client = sb();
+    if (client && UUID_RE.test(id)) {
+      await db.updateOrderDelivery(client, id, {
+        deliveryCompany: deliveryData.deliveryCompany,
+        trackingCode: deliveryData.trackingCode,
+        status,
+        dispatchedAt,
+        labelUrl: deliveryData.labelUrl,
+      });
+    }
   },
   setVariantStock: async (productId, variantId, stock) => {
     const client = sb();

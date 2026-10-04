@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/catalog/catalog-sync.test.ts src/lib/catalog/product-options.test.ts src/lib/analytics/pixels.test.ts src/lib/orders/abandoned.test.ts src/lib/homepage/content.test.ts",
+    "test": "tsx --test src/lib/catalog/catalog-sync.test.ts src/lib/catalog/product-options.test.ts src/lib/analytics/pixels.test.ts src/lib/orders/abandoned.test.ts src/lib/homepage/content.test.ts src/app/api/delivery/dispatch/route.test.ts src/app/api/ecotrack/route.test.ts",
     "seed": "dotenv -e .env.local -- tsx scripts/seed.ts"
   },
   "dependencies": {

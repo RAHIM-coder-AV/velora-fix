@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import {
   Phone,
@@ -27,6 +27,7 @@ import {
   Download,
   ExternalLink,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { Order, OrderStatus } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
 import { formatPrice, timeAgo } from "@/lib/utils";
@@ -58,6 +59,7 @@ export function AdminOrdersTable({
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [bulkDispatching, setBulkDispatching] = useState<"ecotrack" | "nord_ouest" | null>(null);
   const [singleDispatching, setSingleDispatching] = useState<string | null>(null);
+  const dispatchingOrderIds = useRef(new Set<string>());
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [bulkStatusToChange, setBulkStatusToChange] = useState<OrderStatus>("confirmed");
 
@@ -84,7 +86,7 @@ export function AdminOrdersTable({
     return matchesStatus && matchesSearch;
   });
 
-  const statusBadges: Record<OrderStatus, { bg: string; text: string; label: string; icon: any }> = {
+  const statusBadges: Record<OrderStatus, { bg: string; text: string; label: string; icon: LucideIcon }> = {
     pending: {
       bg: "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800",
       text: "جديد",
@@ -183,7 +185,7 @@ export function AdminOrdersTable({
     },
   };
 
-  const statusDropdownOptions: { status: OrderStatus; labelAr: string; labelFr: string; icon: any }[] = [
+  const statusDropdownOptions: { status: OrderStatus; labelAr: string; labelFr: string; icon: LucideIcon }[] = [
     { status: "confirmed", labelAr: "مؤكدة", labelFr: "Confirmée", icon: CheckCircle2 },
     { status: "customer_confirmed", labelAr: "مؤكدة من قبل العميل", labelFr: "Confirmée par client", icon: UserCheck },
     { status: "no_answer", labelAr: "لم يرد على الاتصال", labelFr: "Ne répond pas", icon: PhoneOff },
@@ -215,10 +217,45 @@ export function AdminOrdersTable({
     }
   }
 
+  function handleOrderStatusChange(orderId: string, status: OrderStatus) {
+    const order = orders.find((item) => item.id === orderId);
+    onStatusChange(orderId, status);
+
+    if (
+      !order ||
+      order.trackingCode ||
+      (order.status === "confirmed" || order.status === "customer_confirmed") ||
+      (status !== "confirmed" && status !== "customer_confirmed")
+    ) {
+      return;
+    }
+
+    const automaticCompanies = [
+      ecotrack?.enabled && ecotrack.autoSendConfirmed ? "ecotrack" : null,
+      nordEtOuest?.enabled && nordEtOuest.autoSendConfirmed ? "nord_ouest" : null,
+    ].filter((company): company is "ecotrack" | "nord_ouest" => company !== null);
+    if (automaticCompanies.length > 1) {
+      toast(locale === "ar"
+        ? "فعّل الإرسال التلقائي لشركة واحدة فقط لتجنب إنشاء شحنتين للطلب."
+        : "Choisissez un seul transporteur pour éviter les doublons.");
+    } else if (automaticCompanies.length === 1) {
+      void handleSingleDispatch(order, automaticCompanies[0]);
+    }
+  }
+
   async function handleSingleDispatch(order: Order, company: "ecotrack" | "nord_ouest") {
     const cfg = company === "ecotrack" ? ecotrack : nordEtOuest;
     const label = company === "ecotrack" ? "EcoTrack" : "Nord Et Ouest";
 
+    if (dispatchingOrderIds.current.has(order.id)) return;
+    if (!cfg?.enabled || !cfg.token) {
+      toast(locale === "ar"
+        ? `فعّل الربط وأدخل رمز API حقيقيًا لـ ${label} في الإعدادات أولاً.`
+        : `Activez l'intégration et configurez un vrai jeton API ${label}.`);
+      return;
+    }
+
+    dispatchingOrderIds.current.add(order.id);
     setSingleDispatching(order.id);
     try {
       const res = await fetch("/api/delivery/dispatch", {
@@ -255,19 +292,25 @@ export function AdminOrdersTable({
       const data = await res.json();
       const result = data.results?.[0];
 
-      if (result?.success) {
-        onStatusChange(order.id, "shipped");
-        updateOrderDelivery(order.id, {
-          deliveryCompany: company,
-          trackingCode: result.trackingCode,
-          status: "shipped",
-          labelUrl: result.labelUrl,
-        });
-        toast(
-          locale === "ar"
-            ? `✅ تم رفع الطلب (${order.reference}) إلى ${label} بنجاح! كود التتبع: ${result.trackingCode}`
-            : `✅ Commande envoyée à ${label} ! Suivi: ${result.trackingCode}`
-        );
+      if (res.ok && result?.success && typeof result.trackingCode === "string") {
+        try {
+          await updateOrderDelivery(order.id, {
+            deliveryCompany: company,
+            trackingCode: result.trackingCode,
+            status: "shipped",
+            labelUrl: result.labelUrl,
+          });
+          onStatusChange(order.id, "shipped");
+          toast(
+            locale === "ar"
+              ? `تم إنشاء الشحنة (${order.reference}) لدى ${label}. كود التتبع: ${result.trackingCode}`
+              : `Commande envoyée à ${label}. Suivi : ${result.trackingCode}`
+          );
+        } catch {
+          toast(locale === "ar"
+            ? `أُنشئت الشحنة (${result.trackingCode}) لكن تعذر حفظ بياناتها. لا تعاود الرفع كي لا تتكرر.`
+            : `Expédiée (${result.trackingCode}), mais la sauvegarde a échoué. Ne relancez pas l'envoi.`);
+        }
       } else {
         toast(
           locale === "ar"
@@ -278,6 +321,7 @@ export function AdminOrdersTable({
     } catch {
       toast(locale === "ar" ? `فشل الاتصال بخادم ${label}` : `Erreur de connexion ${label}`);
     } finally {
+      dispatchingOrderIds.current.delete(order.id);
       setSingleDispatching(null);
     }
   }
@@ -289,8 +333,18 @@ export function AdminOrdersTable({
     }
     const cfg = company === "ecotrack" ? ecotrack : nordEtOuest;
     const label = company === "ecotrack" ? "EcoTrack" : "Nord Et Ouest";
+    if (!cfg?.enabled || !cfg.token) {
+      toast(locale === "ar"
+        ? `فعّل الربط وأدخل رمز API حقيقيًا لـ ${label} في الإعدادات أولاً.`
+        : `Activez l'intégration et configurez un vrai jeton API ${label}.`);
+      return;
+    }
 
     const ordersToDispatch = orders.filter((o) => selectedOrderIds.includes(o.id));
+    if (ordersToDispatch.length !== selectedOrderIds.length) {
+      toast(locale === "ar" ? "تعذر العثور على جميع الطلبات المحددة." : "Certaines commandes sélectionnées sont introuvables.");
+      return;
+    }
 
     setBulkDispatching(company);
     try {
@@ -324,29 +378,51 @@ export function AdminOrdersTable({
       });
 
       const data = await res.json();
+      if (!res.ok || !Array.isArray(data.results)) {
+        toast(locale === "ar"
+          ? `تعذر بدء الرفع: ${data.error || "استجابة غير صالحة من الخادم"}`
+          : `Échec de l'envoi : ${data.error || "réponse invalide du serveur"}`);
+        return;
+      }
+
+      const resultsById = new Map<string, (typeof data.results)[number]>();
+      for (const result of data.results) {
+        if (typeof result?.orderId === "string" && !resultsById.has(result.orderId)) {
+          resultsById.set(result.orderId, result);
+        }
+      }
       let successCount = 0;
       let failCount = 0;
+      let persistenceFailureCount = 0;
+      const failedOrderIds: string[] = [];
 
-      for (const result of data.results || []) {
-        if (result.success) {
-          successCount++;
-          onStatusChange(result.orderId, "shipped");
-          updateOrderDelivery(result.orderId, {
+      for (const order of ordersToDispatch) {
+        const result = resultsById.get(order.id);
+        if (!result?.success || typeof result.trackingCode !== "string") {
+          failCount++;
+          failedOrderIds.push(order.id);
+          continue;
+        }
+        successCount++;
+        try {
+          await updateOrderDelivery(order.id, {
             deliveryCompany: company,
             trackingCode: result.trackingCode,
             status: "shipped",
+            labelUrl: result.labelUrl,
           });
-        } else {
-          failCount++;
+          onStatusChange(order.id, "shipped");
+        } catch {
+          persistenceFailureCount++;
         }
       }
 
       toast(
         locale === "ar"
-          ? `✅ تم رفع ${successCount} طلب إلى ${label}${failCount > 0 ? ` — ${failCount} طلب فشل` : ""}!`
-          : `✅ ${successCount} commande(s) envoyée(s) à ${label}${failCount > 0 ? ` — ${failCount} échouée(s)` : ""}`
+          ? `تم إنشاء ${successCount} شحنة لدى ${label}${failCount > 0 ? ` — فشل رفع ${failCount} طلب` : ""}${persistenceFailureCount > 0 ? ` — تعذر حفظ بيانات ${persistenceFailureCount} شحنة؛ لا تعاود رفعها` : ""}.`
+          : `${successCount} envoi(s) créé(s) par ${label}${failCount > 0 ? ` — ${failCount} échec(s)` : ""}${persistenceFailureCount > 0 ? ` — sauvegarde impossible pour ${persistenceFailureCount}; ne relancez pas ces envois` : ""}.`
       );
-      setSelectedOrderIds([]);
+      setSelectedOrderIds(failedOrderIds);
     } catch {
       toast(locale === "ar" ? `فشل الاتصال بخادم ${label}` : `Erreur de connexion ${label}`);
     } finally {
@@ -400,7 +476,7 @@ export function AdminOrdersTable({
       toast(locale === "ar" ? "يرجى تحديد طلب واحد على الأقل" : "Sélectionnez au moins une commande");
       return;
     }
-    selectedOrderIds.forEach((id) => onStatusChange(id, bulkStatusToChange));
+    selectedOrderIds.forEach((id) => handleOrderStatusChange(id, bulkStatusToChange));
     toast(locale === "ar" ? `تم تحديث حالة ${selectedOrderIds.length} طلب!` : `Statut mis à jour pour ${selectedOrderIds.length} commandes !`);
     setSelectedOrderIds([]);
   }
@@ -721,7 +797,7 @@ export function AdminOrdersTable({
                                     key={opt.status}
                                     type="button"
                                     onClick={() => {
-                                      onStatusChange(o.id, opt.status);
+                                      handleOrderStatusChange(o.id, opt.status);
                                       setOpenDropdownId(null);
                                       toast(
                                         locale === "ar"
@@ -829,7 +905,7 @@ export function AdminOrdersTable({
           isOpen={Boolean(selectedOrder)}
           onClose={() => setSelectedOrder(null)}
           onStatusChange={(newStatus) => {
-            onStatusChange(selectedOrder.id, newStatus);
+            handleOrderStatusChange(selectedOrder.id, newStatus);
             setSelectedOrder({ ...selectedOrder, status: newStatus });
           }}
         />

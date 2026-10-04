@@ -56,14 +56,14 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   wilayaPrices: getDefaultWilayaPrices(),
   ecotrack: {
     enabled: true,
-    token: "demo_ecotrack_token_dz",
+    token: "",
     baseUrl: "https://api.ecotrack.dz/api/v1",
     shopId: "",
     autoSendConfirmed: false,
   },
   nordEtOuest: {
     enabled: true,
-    token: "demo_nord_ouest_token_dz",
+    token: "",
     baseUrl: "https://api.nordetouest.com/api/v1",
     shopId: "",
     autoSendConfirmed: false,
