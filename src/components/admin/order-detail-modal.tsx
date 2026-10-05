@@ -475,7 +475,7 @@ export function OrderDetailModal({
               </div>
 
               {editing && editedOrder && (
-                <section ref={editFormRef} className="space-y-4 rounded-xl border border-purple-200 bg-purple-50/70 p-4 sm:col-span-2 dark:border-purple-900 dark:bg-purple-950/20" dir={locale === "ar" ? "rtl" : "ltr"}>
+                <section ref={editFormRef} className="order-edit-form space-y-4 rounded-xl border border-purple-200 bg-purple-50/70 p-4 sm:col-span-2 dark:border-purple-900 dark:bg-purple-950/20" dir={locale === "ar" ? "rtl" : "ltr"}>
                   <h3 className="text-sm font-bold text-purple-950 dark:text-purple-200">
                     {locale === "ar" ? "تعديل بيانات العميل والتوصيل والخيارات" : "Modifier le client, la livraison et les options"}
                   </h3>

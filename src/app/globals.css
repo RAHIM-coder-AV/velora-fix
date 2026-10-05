@@ -74,6 +74,31 @@ select option {
   color: #111827;
 }
 
+.order-edit-form input,
+.order-edit-form select,
+.order-edit-form textarea {
+  background-color: #18181b !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #ffffff;
+}
+
+.order-edit-form input::placeholder,
+.order-edit-form textarea::placeholder {
+  color: #d4d4d8 !important;
+  -webkit-text-fill-color: #d4d4d8;
+  opacity: 1;
+}
+
+.order-edit-form select {
+  color-scheme: light;
+}
+
+.order-edit-form select option {
+  background-color: #ffffff;
+  color: #111827;
+}
+
 select.public-select {
   color-scheme: dark;
 }
