@@ -28,7 +28,8 @@ begin
     payment_method,
     subtotal,
     shipping,
-    total
+    total,
+    is_stopdesk
   )
   values (
     v_reference,
@@ -43,7 +44,8 @@ begin
     coalesce(payload->>'payment_method', 'cod'),
     (payload->>'subtotal')::int,
     (payload->>'shipping')::int,
-    (payload->>'total')::int
+    (payload->>'total')::int,
+    coalesce((payload->>'is_stopdesk')::boolean, false)
   )
   returning id into v_order_id;
 

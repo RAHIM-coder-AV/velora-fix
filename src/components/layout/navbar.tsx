@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Image from "next/image";
 import { Heart, Menu, ShoppingBag, User, X } from "lucide-react";
 import { STORE_NAME } from "@/lib/constants";
 import { useLocale } from "@/providers/locale-provider";
@@ -9,6 +10,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { LanguageSwitcher, LocaleLink } from "@/components/layout/language-switcher";
 import { SearchBar } from "@/components/layout/search-bar";
+import { useSettingsStore } from "@/stores/settings-store";
 
 export function Navbar() {
   const { dict } = useLocale();
@@ -16,6 +18,14 @@ export function Navbar() {
   const hydrated = useHydrated();
   const count = useCartStore((s) => s.items.reduce((n, i) => n + i.quantity, 0));
   const user = useAuthStore((s) => s.user);
+  const storefront = useSettingsStore((s) => s.settings.storefront);
+  const refreshSharedSettings = useSettingsStore((s) => s.refreshSharedSettings);
+
+  useEffect(() => {
+    void refreshSharedSettings().catch((error) => console.error("Failed to load store identity", error));
+  }, [refreshSharedSettings]);
+
+  const storeName = storefront.storeName.trim() || STORE_NAME;
 
   const links = [
     { href: "/", label: dict.nav.home },
@@ -36,8 +46,12 @@ export function Navbar() {
             </LocaleLink>
           ))}
         </nav>
-        <LocaleLink href="/" className="min-w-0 truncate text-center font-serif text-xl tracking-[0.16em] sm:text-2xl sm:tracking-[0.28em]">
-          {STORE_NAME}
+        <LocaleLink href="/" className="flex min-w-0 items-center gap-2 truncate text-center">
+          {storefront.logoUrl ? <Image src={storefront.logoUrl} alt="" width={36} height={36} unoptimized className="h-8 w-8 shrink-0 rounded-full object-cover" /> : null}
+          <span className="min-w-0 truncate">
+            <span className="block truncate font-serif text-xl tracking-[0.16em] sm:text-2xl sm:tracking-[0.28em]">{storeName}</span>
+            {storefront.storeTagline ? <span className="mt-0.5 hidden truncate text-[9px] tracking-normal text-muted sm:block">{storefront.storeTagline}</span> : null}
+          </span>
         </LocaleLink>
         <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           <SearchBar />
@@ -64,7 +78,10 @@ export function Navbar() {
       {open ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-cream pb-[env(safe-area-inset-bottom)] md:hidden">
           <div className="flex items-center justify-between px-5 py-4">
-            <span className="font-serif text-xl tracking-[0.24em]">{STORE_NAME}</span>
+            <span className="flex items-center gap-2 font-serif text-xl tracking-[0.24em]">
+              {storefront.logoUrl ? <Image src={storefront.logoUrl} alt="" width={32} height={32} unoptimized className="h-7 w-7 rounded-full object-cover" /> : null}
+              {storeName}
+            </span>
             <button type="button" onClick={() => setOpen(false)} aria-label={dict.common.close}>
               <X size={20} />
             </button>

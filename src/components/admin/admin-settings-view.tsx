@@ -1,28 +1,53 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Truck,
-  Building2,
-  DollarSign,
   Search,
   CheckCircle2,
-  XCircle,
   Save,
-  Globe,
   Radio,
-  Sliders,
-  ShieldCheck,
   Share2,
+  Store,
+  Tags,
+  ClipboardList,
+  House,
+  Check,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useSettingsStore } from "@/stores/settings-store";
 import { PixelSettingsEditor } from "@/components/admin/pixel-settings-editor";
+import { AdminCategoriesSettings } from "@/components/admin/admin-categories-settings";
+import type { Category } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
-import { formatPrice } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
-import { ALGERIA_WILAYAS } from "@/lib/algeria-data";
+import { isSupabaseConfigured } from "@/lib/supabase/configured";
 
-export function AdminSettingsView() {
+type SettingsSection =
+  | "overview"
+  | "delivery"
+  | "integrations"
+  | "ecotrack"
+  | "nord_ouest"
+  | "pixels"
+  | "form"
+  | "categories"
+  | "identity"
+  | "thankyou";
+
+interface AdminSettingsViewProps {
+  categories: Category[];
+  onSaveCategory: (category: Category) => Promise<void>;
+  onDeleteCategory: (id: string) => Promise<void>;
+  onOpenHomepage: () => void;
+}
+
+export function AdminSettingsView({
+  categories,
+  onSaveCategory,
+  onDeleteCategory,
+  onOpenHomepage,
+}: AdminSettingsViewProps) {
   const { locale } = useLocale();
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
@@ -30,9 +55,11 @@ export function AdminSettingsView() {
   const bulkUpdateWilayas = useSettingsStore((s) => s.bulkUpdateWilayas);
   const updateEcoTrack = useSettingsStore((s) => s.updateEcoTrack);
   const updateNordEtOuest = useSettingsStore((s) => s.updateNordEtOuest);
-  const updatePixels = useSettingsStore((s) => s.updatePixels);
+  const refreshSharedSettings = useSettingsStore((s) => s.refreshSharedSettings);
+  const saveSharedSettings = useSettingsStore((s) => s.saveSharedSettings);
+  const [savingShared, setSavingShared] = useState(false);
 
-  const [activeSubTab, setActiveSubTab] = useState<"delivery" | "ecotrack" | "nord_ouest" | "pixels" | "pixels_legacy">("delivery");
+  const [activeSubTab, setActiveSubTab] = useState<SettingsSection>("overview");
   const [searchQuery, setSearchQuery] = useState("");
   const [bulkHome, setBulkHome] = useState("");
   const [bulkDesk, setBulkDesk] = useState("");
@@ -51,17 +78,37 @@ export function AdminSettingsView() {
   const [nordAutoSend, setNordAutoSend] = useState(settings.nordEtOuest?.autoSendConfirmed ?? false);
   const [isTestingNord, setIsTestingNord] = useState(false);
 
-  const [metaPixelIds, setMetaPixelIds] = useState(settings.pixels.metaPixelIds);
-  const [metaPixelEnabled, setMetaPixelEnabled] = useState(settings.pixels.metaPixelEnabled);
-  const [tiktokPixelIds, setTiktokPixelIds] = useState(settings.pixels.tiktokPixelIds);
-  const [tiktokPixelEnabled, setTiktokPixelEnabled] = useState(settings.pixels.tiktokPixelEnabled);
-  const [savingPixels, setSavingPixels] = useState(false);
-  const [fbPixel1, setFbPixel1] = useState("");
-  const [fbPixel1Enabled, setFbPixel1Enabled] = useState(false);
-  const [fbPixel2, setFbPixel2] = useState("");
-  const [fbPixel2Enabled, setFbPixel2Enabled] = useState(false);
-  const [tiktokPixel, setTiktokPixel] = useState("");
-  const [legacyTiktokPixelEnabled, setLegacyTiktokPixelEnabled] = useState(false);
+  const storefront = settings.storefront;
+
+  useEffect(() => {
+    void refreshSharedSettings().catch((error) => {
+      console.error("Failed to load shared store settings", error);
+      toast(locale === "ar" ? "تعذر تحميل إعدادات المتجر المشتركة." : "Impossible de charger les paramètres partagés.");
+    });
+  }, [locale, refreshSharedSettings]);
+
+  function updateStorefront(
+    patch: Partial<typeof storefront>,
+  ) {
+    updateSettings({ storefront: { ...useSettingsStore.getState().settings.storefront, ...patch } });
+  }
+
+  async function saveShared() {
+    if (!isSupabaseConfigured()) {
+      toast(locale === "ar" ? "حُفظت الإعدادات على هذا المتصفح فقط. اربط Supabase لمشاركتها مع الزوار." : "Paramètres enregistrés sur ce navigateur uniquement. Configurez Supabase pour les partager.");
+      return;
+    }
+    setSavingShared(true);
+    try {
+      await saveSharedSettings();
+      toast(locale === "ar" ? "تم حفظ إعدادات المتجر لجميع الزوار." : "Paramètres enregistrés pour la boutique.");
+    } catch (error) {
+      console.error("Failed to save shared store settings", error);
+      toast(locale === "ar" ? "تعذر الحفظ المشترك. تحقق من تطبيق migration 0009 وصلاحيات المدير." : "Échec. Vérifiez la migration 0009 et les droits admin.");
+    } finally {
+      setSavingShared(false);
+    }
+  }
 
   // Filter Wilayas
   const filteredWilayas = useMemo(() => {
@@ -177,24 +224,6 @@ export function AdminSettingsView() {
     }
   }
 
-  async function handleSavePixels() {
-    setSavingPixels(true);
-    try {
-      await updatePixels({
-        metaPixelIds: metaPixelIds.map((id) => id.trim()),
-        metaPixelEnabled,
-        tiktokPixelIds: tiktokPixelIds.map((id) => id.trim()),
-        tiktokPixelEnabled,
-      });
-      toast(locale === "ar" ? "تم حفظ معرفات التتبع." : "Pixels enregistrés.");
-    } catch (error) {
-      console.error("Failed to save pixel settings", error);
-      toast(locale === "ar" ? "تعذر الحفظ. تحقق من إعداد قاعدة البيانات وصلاحية المدير." : "Échec de l'enregistrement. Vérifiez la base et les droits.");
-    } finally {
-      setSavingPixels(false);
-    }
-  }
-
   function handleApplyBulk() {
     const updates: { homePrice?: number; deskPrice?: number } = {};
     if (bulkHome && !isNaN(Number(bulkHome))) updates.homePrice = Number(bulkHome);
@@ -210,20 +239,55 @@ export function AdminSettingsView() {
 
   return (
     <div className="space-y-6">
-      {/* Header and Sub-tabs */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="space-y-4">
         <div>
           <h1 className="text-xl font-black text-zinc-900 dark:text-zinc-100">
-            {locale === "ar" ? "إعدادات المتجر وشركات التوصيل" : "Paramètres et Intégrations"}
+            {locale === "ar" ? "إعدادات المتجر" : "Paramètres du magasin"}
           </h1>
           <p className="mt-1 text-xs text-zinc-500">
             {locale === "ar"
-              ? "إدارة أسعار التوصيل لـ 58 ولاية، ربط شركات التوصيل (EcoTrack & Nord Et Ouest)، والبيكسلات الإعلانية."
-              : "Tarifs de livraison, intégrations EcoTrack & Nord Et Ouest, et Pixels."}
+              ? "إدارة الشحن والخدمات والنماذج والفئات وهوية المتجر وصفحة الشكر من مكان واحد."
+              : "Gérez la livraison, les intégrations, les formulaires, les catégories, l’identité et la page de remerciement."}
           </p>
         </div>
 
-        {/* Tab Switcher */}
+        {activeSubTab !== "overview" && (
+          <button type="button" onClick={() => setActiveSubTab("overview")} className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-bold text-zinc-700 dark:border-zinc-700 dark:text-zinc-200">
+            {locale === "ar" ? "العودة إلى أقسام الإعدادات" : "Retour aux paramètres"}
+          </button>
+        )}
+
+        {activeSubTab === "overview" && (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {([
+              { title: locale === "ar" ? "أسعار الشحن والتوصيل" : "Tarifs de livraison", description: locale === "ar" ? "تعديل أسعار المنزل والمكتب حسب الولاية." : "Tarifs domicile et point relais par wilaya.", icon: Truck, tab: "delivery" as const },
+              { title: locale === "ar" ? "الربط مع الخدمات" : "Intégrations", description: locale === "ar" ? "إعداد Meta Pixel وTikTok وخدمات الشحن." : "Meta Pixel, TikTok et transporteurs.", icon: Share2, tab: "integrations" as const },
+              { title: locale === "ar" ? "إعدادات النموذج" : "Formulaires", description: locale === "ar" ? "التحكم في حقول الطلب في السلة وصفحة المنتج." : "Champs de commande du panier et du produit.", icon: ClipboardList, tab: "form" as const },
+              { title: locale === "ar" ? "الصفحة الرئيسية وصفحة المنتج" : "Accueil et page produit", description: locale === "ar" ? "تحرير محتوى الصفحة الرئيسية ومظهر صفحات المنتجات." : "Modifier l’accueil et les pages produit.", icon: House, action: "homepage" as const },
+              { title: locale === "ar" ? "إعدادات المتجر" : "Identité du magasin", description: locale === "ar" ? "اسم المتجر وشعاره النصي ورابط الشعار." : "Nom, slogan et logo de la boutique.", icon: Store, tab: "identity" as const },
+              { title: locale === "ar" ? "إدارة الفئات" : "Catégories", description: locale === "ar" ? "إضافة الفئات وتعديل أسمائها ووصفها وصورها." : "Créer et modifier les catégories.", icon: Tags, tab: "categories" as const },
+              { title: locale === "ar" ? "صفحة الشكر" : "Page de remerciement", description: locale === "ar" ? "تعديل العنوان والنص الظاهر بعد إتمام الطلب." : "Personnaliser le message après la commande.", icon: Check, tab: "thankyou" as const },
+            ] satisfies Array<{ title: string; description: string; icon: LucideIcon; tab?: SettingsSection; action?: "homepage" }>).map((card) => {
+              const Icon = card.icon;
+              return (
+                <button
+                  key={card.title}
+                  type="button"
+                  onClick={() => card.action === "homepage" ? onOpenHomepage() : card.tab && setActiveSubTab(card.tab)}
+                  className="flex min-h-24 items-center gap-4 rounded-xl border border-zinc-200 bg-white p-4 text-start transition hover:border-purple-400 hover:bg-purple-50/50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-purple-700 dark:hover:bg-purple-950/20"
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300"><Icon size={20} /></span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-zinc-900 dark:text-zinc-100">{card.title}</span>
+                    <span className="mt-1 block text-xs leading-5 text-zinc-500">{card.description}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {activeSubTab !== "overview" && (
         <div className="grid w-full grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 sm:inline-flex sm:w-auto sm:grid-cols-none dark:bg-zinc-800">
           <button
             type="button"
@@ -240,15 +304,15 @@ export function AdminSettingsView() {
 
           <button
             type="button"
-            onClick={() => setActiveSubTab("ecotrack")}
+            onClick={() => setActiveSubTab("integrations")}
             className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-center text-[11px] font-bold transition sm:px-3.5 sm:py-1.5 sm:text-xs ${
-              activeSubTab === "ecotrack"
+              activeSubTab === "integrations" || activeSubTab === "ecotrack" || activeSubTab === "nord_ouest" || activeSubTab === "pixels"
                 ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
                 : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
             <Share2 size={14} className="text-emerald-600" />
-            <span>{locale === "ar" ? "شركة EcoTrack" : "EcoTrack"}</span>
+            <span>{locale === "ar" ? "ربط الخدمات" : "Intégrations"}</span>
           </button>
 
           <button
@@ -277,11 +341,49 @@ export function AdminSettingsView() {
             <span>{locale === "ar" ? "البيكسل الإعلاني" : "Pixels"}</span>
           </button>
         </div>
+        )}
       </div>
+
+      {activeSubTab === "integrations" && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {([
+            { label: "EcoTrack", description: locale === "ar" ? "رفع الطلبات وإنشاء الشحنات." : "Expédition des commandes.", tab: "ecotrack" as const, icon: Truck },
+            { label: "Nord Et Ouest", description: locale === "ar" ? "إعداد اتصال شركة التوصيل." : "Configurer le transporteur.", tab: "nord_ouest" as const, icon: Truck },
+            { label: locale === "ar" ? "Meta Pixel وTikTok" : "Meta Pixel et TikTok", description: locale === "ar" ? "معرفات التتبع وموافقة التسويق." : "Pixels et consentement marketing.", tab: "pixels" as const, icon: Radio },
+          ]).map((service) => {
+            const Icon = service.icon;
+            return <button key={service.tab} type="button" onClick={() => setActiveSubTab(service.tab)} className="rounded-xl border border-zinc-200 bg-white p-5 text-start hover:border-purple-400 dark:border-zinc-800 dark:bg-zinc-900"><Icon size={20} className="mb-3 text-purple-600" /><span className="block text-sm font-bold">{service.label}</span><span className="mt-1 block text-xs text-zinc-500">{service.description}</span></button>;
+          })}
+        </div>
+      )}
 
       {/* TAB 1: DELIVERY PRICING */}
       {activeSubTab === "delivery" && (
         <div className="space-y-6">
+          <div className="flex flex-wrap items-end gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <label className="min-w-48 flex-1 space-y-1 text-xs font-semibold">
+              <span>{locale === "ar" ? "نظام حساب التوصيل" : "Calcul de la livraison"}</span>
+              <select value={settings.shippingType} onChange={(event) => updateSettings({ shippingType: event.target.value as typeof settings.shippingType })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100">
+                <option value="custom">{locale === "ar" ? "حسب الولاية" : "Par wilaya"}</option>
+                <option value="fixed">{locale === "ar" ? "سعر ثابت" : "Prix fixe"}</option>
+                <option value="free">{locale === "ar" ? "توصيل مجاني" : "Gratuit"}</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-xs font-semibold">
+              <span>{locale === "ar" ? "ثابت للمنزل" : "Fixe domicile"}</span>
+              <input type="number" min="0" value={settings.defaultHomePrice} onChange={(event) => updateSettings({ defaultHomePrice: Math.max(0, Number(event.target.value)) })} className="block w-32 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
+            </label>
+            <label className="space-y-1 text-xs font-semibold">
+              <span>{locale === "ar" ? "ثابت للمكتب" : "Fixe point relais"}</span>
+              <input type="number" min="0" value={settings.defaultDeskPrice} onChange={(event) => updateSettings({ defaultDeskPrice: Math.max(0, Number(event.target.value)) })} className="block w-32 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
+            </label>
+            <label className="space-y-1 text-xs font-semibold">
+              <span>{locale === "ar" ? "الشحن مجاني ابتداءً من (د.ج)" : "Livraison gratuite dès (DZD)"}</span>
+              <input type="number" min="0" value={settings.freeShippingThreshold} onChange={(event) => updateSettings({ freeShippingThreshold: Math.max(0, Number(event.target.value)) })} className="block w-40 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
+            </label>
+            <button type="button" disabled={savingShared} onClick={() => void saveShared()} className="flex items-center gap-2 rounded-lg bg-purple-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"><Save size={14} />{locale === "ar" ? "حفظ أسعار وإعدادات التوصيل" : "Enregistrer les tarifs"}</button>
+          </div>
+
           {/* Quick Bulk Pricing Tool */}
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
@@ -415,6 +517,82 @@ export function AdminSettingsView() {
             ))}
           </div>
         </div>
+      )}
+
+      {activeSubTab === "form" && (
+        <div className="max-w-3xl space-y-5" dir={locale === "ar" ? "rtl" : "ltr"}>
+          <section className="space-y-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+            <div>
+              <h2 className="font-bold">{locale === "ar" ? "إعدادات نموذج السلة" : "Formulaire du panier"}</h2>
+              <p className="mt-1 text-xs text-zinc-500">{locale === "ar" ? "التحكم في ظهور البريد والملاحظات والنص الإرشادي." : "Affichez ou masquez l’e-mail et les notes."}</p>
+            </div>
+            <label className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
+              <span>{locale === "ar" ? "إظهار البريد الإلكتروني في نموذج السلة" : "Afficher l’e-mail dans le panier"}</span>
+              <input type="checkbox" checked={storefront.checkout.showEmail} onChange={(event) => updateStorefront({ checkout: { ...storefront.checkout, showEmail: event.target.checked } })} />
+            </label>
+            <label className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
+              <span>{locale === "ar" ? "إظهار خانة ملاحظات الطلب" : "Afficher les notes de commande"}</span>
+              <input type="checkbox" checked={storefront.checkout.showNotes} onChange={(event) => updateStorefront({ checkout: { ...storefront.checkout, showNotes: event.target.checked } })} />
+            </label>
+            {(["ar", "fr"] as const).map((language) => (
+              <label key={language} className="block space-y-1 text-xs font-semibold">
+                <span>{locale === "ar" ? "النص الإرشادي لنموذج السلة" : "Texte du formulaire panier"} ({language === "ar" ? "العربية" : "Français"})</span>
+                <input dir={language === "ar" ? "rtl" : "ltr"} value={storefront.checkout.intro[language]} onChange={(event) => updateStorefront({ checkout: { ...storefront.checkout, intro: { ...storefront.checkout.intro, [language]: event.target.value } } })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
+              </label>
+            ))}
+          </section>
+          <section className="space-y-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+            <h2 className="font-bold">{locale === "ar" ? "نموذج الطلب السريع في صفحة المنتج" : "Formulaire rapide de la page produit"}</h2>
+            <label className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
+              <span>{locale === "ar" ? "إظهار خانة العنوان" : "Afficher l’adresse"}</span>
+              <input type="checkbox" checked={storefront.productForm.showAddress} onChange={(event) => updateStorefront({ productForm: { ...storefront.productForm, showAddress: event.target.checked } })} />
+            </label>
+            {(["ar", "fr"] as const).map((language) => (
+              <label key={language} className="block space-y-1 text-xs font-semibold">
+                <span>{locale === "ar" ? "النص الإرشادي لصفحة المنتج" : "Texte de la page produit"} ({language === "ar" ? "العربية" : "Français"})</span>
+                <input dir={language === "ar" ? "rtl" : "ltr"} value={storefront.productForm.intro[language]} onChange={(event) => updateStorefront({ productForm: { ...storefront.productForm, intro: { ...storefront.productForm.intro, [language]: event.target.value } } })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
+              </label>
+            ))}
+          </section>
+          <button type="button" disabled={savingShared} onClick={() => void saveShared()} className="flex items-center gap-2 rounded-lg bg-purple-700 px-5 py-3 text-xs font-bold text-white disabled:opacity-50"><Save size={14} />{locale === "ar" ? "حفظ إعدادات النماذج" : "Enregistrer les formulaires"}</button>
+        </div>
+      )}
+
+      {activeSubTab === "identity" && (
+        <section className="max-w-2xl space-y-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900" dir={locale === "ar" ? "rtl" : "ltr"}>
+          <h2 className="font-bold">{locale === "ar" ? "هوية المتجر" : "Identité du magasin"}</h2>
+          <label className="block space-y-1 text-xs font-semibold">
+            <span>{locale === "ar" ? "اسم المتجر" : "Nom du magasin"}</span>
+            <input value={storefront.storeName} onChange={(event) => updateStorefront({ storeName: event.target.value })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
+          </label>
+          <label className="block space-y-1 text-xs font-semibold">
+            <span>{locale === "ar" ? "الشعار النصي" : "Slogan"}</span>
+            <input value={storefront.storeTagline} onChange={(event) => updateStorefront({ storeTagline: event.target.value })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
+          </label>
+          <label className="block space-y-1 text-xs font-semibold">
+            <span>{locale === "ar" ? "رابط صورة الشعار (اختياري)" : "URL du logo (facultatif)"}</span>
+            <input dir="ltr" type="url" value={storefront.logoUrl} onChange={(event) => updateStorefront({ logoUrl: event.target.value })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
+          </label>
+          <p className="text-xs text-zinc-500">{locale === "ar" ? "يظهر الاسم والشعار في شريط المتجر. اترك رابط الصورة فارغًا لاستخدام الاسم كنص." : "Le nom et le logo apparaissent dans l’en-tête."}</p>
+          <button type="button" disabled={savingShared} onClick={() => void saveShared()} className="flex items-center gap-2 rounded-lg bg-purple-700 px-5 py-3 text-xs font-bold text-white disabled:opacity-50"><Save size={14} />{locale === "ar" ? "حفظ هوية المتجر" : "Enregistrer l’identité"}</button>
+        </section>
+      )}
+
+      {activeSubTab === "thankyou" && (
+        <section className="max-w-3xl space-y-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900" dir={locale === "ar" ? "rtl" : "ltr"}>
+          <div><h2 className="font-bold">{locale === "ar" ? "محتوى صفحة الشكر" : "Contenu de la page de remerciement"}</h2><p className="mt-1 text-xs text-zinc-500">{locale === "ar" ? "يظهر بعد إنشاء الطلب. استخدم {ref} لإظهار رقم الطلب." : "Affiché après la commande. Utilisez {ref} pour insérer sa référence."}</p></div>
+          {(["title", "body", "buttonLabel"] as const).map((field) => (
+            <fieldset key={field} className="grid gap-3 sm:grid-cols-2">
+              <legend className="mb-2 text-xs font-bold">{field === "title" ? locale === "ar" ? "العنوان" : "Titre" : field === "body" ? locale === "ar" ? "رسالة التأكيد" : "Message" : locale === "ar" ? "زر المتابعة" : "Bouton"}</legend>
+              {(["ar", "fr"] as const).map((language) => <label key={language} className="space-y-1 text-xs font-medium"><span>{language === "ar" ? "العربية" : "Français"}</span><textarea rows={field === "body" ? 3 : 1} dir={language === "ar" ? "rtl" : "ltr"} value={storefront.thankYou[field][language]} onChange={(event) => updateStorefront({ thankYou: { ...storefront.thankYou, [field]: { ...storefront.thankYou[field], [language]: event.target.value } } })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" /></label>)}
+            </fieldset>
+          ))}
+          <button type="button" disabled={savingShared} onClick={() => void saveShared()} className="flex items-center gap-2 rounded-lg bg-purple-700 px-5 py-3 text-xs font-bold text-white disabled:opacity-50"><Save size={14} />{locale === "ar" ? "حفظ صفحة الشكر" : "Enregistrer la page"}</button>
+        </section>
+      )}
+
+      {activeSubTab === "categories" && (
+        <AdminCategoriesSettings categories={categories} onSave={onSaveCategory} onDelete={onDeleteCategory} />
       )}
 
       {/* TAB 2: ECOTRACK INTEGRATION */}
@@ -664,123 +842,7 @@ export function AdminSettingsView() {
         </div>
       )}
 
-      {/* TAB: META & TIKTOK PIXELS */}
-
       {activeSubTab === "pixels" && <PixelSettingsEditor />}
-
-      {activeSubTab === "pixels_legacy" && (
-        <div className="max-w-2xl space-y-6">
-          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="mb-5 flex items-center gap-3 border-b border-zinc-100 pb-4 dark:border-zinc-800">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40">
-                <Radio size={24} />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                  {locale === "ar" ? "ربط البيكسل (Meta Pixel & TikTok Pixel)" : "Configuration des Pixels"}
-                </h2>
-                <p className="text-xs text-zinc-500">
-                  {locale === "ar"
-                    ? "تتبع الزوار، إضافة للسلة، وعمليات الشراء الناجحة لفيسبوك وإنستغرام وتيك توك."
-                    : "Suivi des visites, ajouts au panier et achats (Purchases)."}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-5">
-              {/* Facebook Pixel 1 */}
-              <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                    {locale === "ar" ? "🔵 معرف بيكسل فيسبوك 1 (Facebook Pixel 1)" : "Pixel Facebook 1"}
-                  </span>
-                  <label className="flex cursor-pointer items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      checked={fbPixel1Enabled}
-                      onChange={(e) => setFbPixel1Enabled(e.target.checked)}
-                      className="rounded border-zinc-300 text-blue-600"
-                    />
-                    <span className="text-[11px] font-medium text-zinc-500">
-                      {fbPixel1Enabled ? (locale === "ar" ? "مفعل" : "Actif") : (locale === "ar" ? "معطل" : "Inactif")}
-                    </span>
-                  </label>
-                </div>
-                <input
-                  type="text"
-                  value={fbPixel1}
-                  onChange={(e) => setFbPixel1(e.target.value)}
-                  placeholder="مثال: 1587890319488451"
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
-                />
-              </div>
-
-              {/* Facebook Pixel 2 */}
-              <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                    {locale === "ar" ? "🔵 معرف بيكسل فيسبوك 2 الاحتياطي (Pixel 2)" : "Pixel Facebook 2 (Backup)"}
-                  </span>
-                  <label className="flex cursor-pointer items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      checked={fbPixel2Enabled}
-                      onChange={(e) => setFbPixel2Enabled(e.target.checked)}
-                      className="rounded border-zinc-300 text-blue-600"
-                    />
-                    <span className="text-[11px] font-medium text-zinc-500">
-                      {fbPixel2Enabled ? (locale === "ar" ? "مفعل" : "Actif") : (locale === "ar" ? "معطل" : "Inactif")}
-                    </span>
-                  </label>
-                </div>
-                <input
-                  type="text"
-                  value={fbPixel2}
-                  onChange={(e) => setFbPixel2(e.target.value)}
-                  placeholder="مثال: 964426659900464"
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
-                />
-              </div>
-
-              {/* TikTok Pixel */}
-              <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                    {locale === "ar" ? "🎵 معرف بيكسل تيك توك (TikTok Pixel ID)" : "Pixel TikTok ID"}
-                  </span>
-                  <label className="flex cursor-pointer items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      checked={legacyTiktokPixelEnabled}
-                      onChange={(e) => setLegacyTiktokPixelEnabled(e.target.checked)}
-                      className="rounded border-zinc-300 text-purple-600"
-                    />
-                    <span className="text-[11px] font-medium text-zinc-500">
-                      {legacyTiktokPixelEnabled ? (locale === "ar" ? "مفعل" : "Actif") : (locale === "ar" ? "معطل" : "Inactif")}
-                    </span>
-                  </label>
-                </div>
-                <input
-                  type="text"
-                  value={tiktokPixel}
-                  onChange={(e) => setTiktokPixel(e.target.value)}
-                  placeholder="مثال: C1234567890ABCDEFG"
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-800"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleSavePixels}
-                className="flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-6 py-2.5 text-xs font-bold text-white transition hover:bg-purple-700 active:scale-95"
-              >
-                <Save size={15} />
-                <span>{locale === "ar" ? "حفظ البيكسلات" : "Enregistrer les Pixels"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

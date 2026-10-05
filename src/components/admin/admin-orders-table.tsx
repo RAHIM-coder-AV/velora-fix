@@ -12,7 +12,6 @@ import {
   Check,
   XCircle,
   Search,
-  SendHorizonal,
   Copy,
   UserCheck,
   PhoneOff,
@@ -25,7 +24,6 @@ import {
   ChevronDown,
   Printer,
   Download,
-  ExternalLink,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Order, OrderStatus } from "@/types";
@@ -908,6 +906,7 @@ export function AdminOrdersTable({
             handleOrderStatusChange(selectedOrder.id, newStatus);
             setSelectedOrder({ ...selectedOrder, status: newStatus });
           }}
+          onOrderSaved={setSelectedOrder}
         />
       )}
     </div>

@@ -163,8 +163,21 @@ export interface AbandonedCheckout {
   phone?: string;
   wilaya?: string;
   commune?: string;
+  items?: AbandonedCheckoutItem[];
   createdAt: string;
   expiresAt: string;
+}
+
+export interface AbandonedCheckoutItem {
+  productId: string;
+  variantId: string;
+  name: Localized;
+  size: string;
+  color: Localized;
+  image: string;
+  unitPrice: number;
+  quantity: number;
+  sku?: string;
 }
 
 export interface Filters {

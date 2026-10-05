@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { trackInitiateCheckoutEvent } from "@/components/analytics/analytics-scripts";
 import { useCatalogStore } from "@/stores/catalog-store";
-import type { AbandonedCheckout } from "@/types";
+import type { AbandonedCheckout, AbandonedCheckoutItem } from "@/types";
 
 interface DraftInput {
   productId: string;
@@ -17,6 +17,7 @@ interface DraftInput {
   phone: string;
   wilaya: string;
   commune: string;
+  items?: AbandonedCheckoutItem[];
 }
 
 export function useAbandonedCheckout(input: DraftInput) {
@@ -48,6 +49,14 @@ export function useAbandonedCheckout(input: DraftInput) {
             phone: input.phone,
             wilaya: input.wilaya,
             commune: input.commune,
+          }
+        : {}),
+      ...(input.items?.length
+        ? {
+            items: input.items.map((item) => ({
+              ...item,
+              quantity: Math.max(1, Math.min(1000, Math.trunc(item.quantity) || 1)),
+            })),
           }
         : {}),
       createdAt: createdAt.current,

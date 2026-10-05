@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ALGERIA_WILAYAS, getCommunesForWilaya } from "@/lib/algeria-data";
 import { isAlgerianPhone, orderReference, uid } from "@/lib/utils";
@@ -12,7 +12,6 @@ import { useCatalogStore } from "@/stores/catalog-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLocale } from "@/providers/locale-provider";
-import { cartTotals } from "@/components/cart/cart-view";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { formatPrice } from "@/lib/utils";
@@ -29,6 +28,8 @@ export function CheckoutForm() {
   const products = useCatalogStore((s) => s.products);
   const addOrder = useCatalogStore((s) => s.addOrder);
   const setVariantStock = useCatalogStore((s) => s.setVariantStock);
+  const storefront = useSettingsStore((s) => s.settings.storefront);
+  const refreshSharedSettings = useSettingsStore((s) => s.refreshSharedSettings);
   const router = useRouter();
 
   const [form, setForm] = useState({
@@ -44,6 +45,10 @@ export function CheckoutForm() {
   const [placed, setPlaced] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [contactConsent, setContactConsent] = useState(false);
+
+  useEffect(() => {
+    void refreshSharedSettings().catch((error) => console.error("Failed to load checkout settings", error));
+  }, [refreshSharedSettings]);
 
   const lines = useMemo(
     () =>
@@ -86,6 +91,17 @@ export function CheckoutForm() {
     phone: form.phone,
     wilaya: form.wilaya,
     commune: form.commune,
+    items: lines.map(({ product, variant, item }) => ({
+      productId: product.id,
+      variantId: variant.id,
+      name: product.name,
+      size: variant.size,
+      color: variant.color,
+      image: product.images[0]?.url ?? "",
+      unitPrice: product.price,
+      quantity: item.quantity,
+      sku: variant.sku,
+    })),
   });
 
   function validate() {
@@ -214,6 +230,7 @@ export function CheckoutForm() {
     >
       <div className="min-w-0 space-y-5">
         <h2 className="font-serif text-2xl">{dict.checkout.details}</h2>
+        <p className="text-sm text-muted">{storefront.checkout.intro[locale]}</p>
         <label className="flex items-start gap-2 rounded-lg border border-line p-3 text-xs leading-5 text-muted">
           <input
             type="checkbox"
@@ -233,6 +250,11 @@ export function CheckoutForm() {
         <Field label={dict.checkout.phone} error={errors.phone}>
           <Input value={form.phone} placeholder="0550 00 00 00" onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         </Field>
+        {storefront.checkout.showEmail && (
+          <Field label={locale === "ar" ? "البريد الإلكتروني (اختياري)" : "E-mail (facultatif)"}>
+            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </Field>
+        )}
         <Field label={dict.checkout.wilaya} error={errors.wilaya}>
           <Select
             value={form.wilaya}
@@ -271,9 +293,11 @@ export function CheckoutForm() {
         <Field label={dict.checkout.address} error={errors.address}>
           <Textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
         </Field>
-        <Field label={dict.checkout.notes}>
-          <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-        </Field>
+        {storefront.checkout.showNotes && (
+          <Field label={dict.checkout.notes}>
+            <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          </Field>
+        )}
         <div className="border border-line bg-white p-4">
           <p className="text-sm font-medium">{dict.checkout.cod}</p>
           <p className="mt-1 text-sm text-muted">{dict.checkout.codHelp}</p>

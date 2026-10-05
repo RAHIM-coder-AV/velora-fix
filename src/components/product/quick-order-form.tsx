@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, FormEvent } from "react";
+import { useState, useMemo, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { User, Phone, MapPin, Home, CheckCircle2, Truck, ShieldCheck, Tag, Building2 } from "lucide-react";
+import { User, Home, Truck, ShieldCheck, Tag, Building2 } from "lucide-react";
 import type { Product, ProductOffer, Order } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
 import { ALGERIA_WILAYAS, getCommunesForWilaya } from "@/lib/algeria-data";
@@ -93,7 +93,13 @@ export function QuickOrderForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const getShippingFee = useSettingsStore((s) => s.getShippingFee);
+  const storefront = useSettingsStore((s) => s.settings.storefront);
+  const refreshSharedSettings = useSettingsStore((s) => s.refreshSharedSettings);
   const shippingFee = useMemo(() => getShippingFee(wilaya, deliveryType), [getShippingFee, wilaya, deliveryType]);
+
+  useEffect(() => {
+    void refreshSharedSettings().catch((error) => console.error("Failed to load product form settings", error));
+  }, [refreshSharedSettings]);
 
   // Dynamic communes list based on selected wilaya
   const communes = useMemo(() => getCommunesForWilaya(wilaya), [wilaya]);
@@ -116,6 +122,19 @@ export function QuickOrderForm({
     phone,
     wilaya,
     commune,
+    items: selectedVariant
+      ? [{
+          productId: product.id,
+          variantId: selectedVariant.id,
+          name: product.name,
+          size: selectedVariant.size,
+          color: selectedVariant.color,
+          image: product.images[0]?.url ?? "",
+          unitPrice: Math.round(currentPrice / (selectedOffer?.quantity ?? 1)),
+          quantity: selectedOffer?.quantity ?? 1,
+          sku: selectedVariant.sku,
+        }]
+      : [],
   });
 
   function validate() {
@@ -175,7 +194,7 @@ export function QuickOrderForm({
         phone: phone.trim(),
         wilaya: wilaya,
         commune: commune.trim(),
-        address: (address.trim() || "توصيل للعنوان") + (deliveryType === "desk" ? " (استلام من المكتب)" : " (توصيل للمنزل)"),
+        address: (storefront.productForm.showAddress ? address.trim() || "توصيل للعنوان" : "بدون عنوان إضافي") + (deliveryType === "desk" ? " (استلام من المكتب)" : " (توصيل للمنزل)"),
         status: "pending",
         paymentMethod: "cod",
         subtotal: currentPrice,
@@ -251,6 +270,7 @@ export function QuickOrderForm({
         onClickCapture={abandonedCheckout.startTracking}
         className="space-y-5"
       >
+        <p className="text-xs leading-5 text-zinc-600 dark:text-zinc-300">{storefront.productForm.intro[locale]}</p>
         {/* Customer Information Section */}
         <div className="space-y-3">
           <label className="flex items-start gap-2 rounded-lg border border-zinc-200 p-3 text-[11px] leading-5 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
@@ -442,7 +462,7 @@ export function QuickOrderForm({
           </div>
 
           {/* Address */}
-          <div>
+          {storefront.productForm.showAddress && <div>
             <label className="mb-1 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
               {deliveryType === "home"
                 ? (locale === "ar" ? "العنوان أو الحي بالتفصيل" : "Adresse de livraison (Rue, Quartier)")
@@ -459,7 +479,7 @@ export function QuickOrderForm({
               }
               className="form-control w-full rounded-lg border px-3.5 py-2.5 text-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
-          </div>
+          </div>}
         </div>
 
         {/* Offers / Packs Selection Section */}

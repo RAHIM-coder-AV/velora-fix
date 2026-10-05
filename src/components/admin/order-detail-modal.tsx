@@ -10,24 +10,25 @@ import {
   User,
   CheckCircle2,
   Truck,
-  Package,
   Copy,
-  ExternalLink,
   SendHorizonal,
 } from "lucide-react";
-import type { Order, OrderStatus } from "@/types";
+import type { Order, OrderItem, OrderStatus } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
 import { formatPrice } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useCatalogStore } from "@/stores/catalog-store";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
+import { ALGERIA_WILAYAS } from "@/lib/algeria-data";
+import { calculateOrderTotals, canEditOrder } from "@/lib/orders/order-editing";
 
 interface OrderDetailModalProps {
   order: Order | null;
   isOpen: boolean;
   onClose: () => void;
   onStatusChange: (status: OrderStatus) => void;
+  onOrderSaved: (order: Order) => void;
 }
 
 export function OrderDetailModal({
@@ -35,13 +36,22 @@ export function OrderDetailModal({
   isOpen,
   onClose,
   onStatusChange,
+  onOrderSaved,
 }: OrderDetailModalProps) {
   const { locale } = useLocale();
   const ecotrack = useSettingsStore((s) => s.settings.ecotrack);
   const nordEtOuest = useSettingsStore((s) => s.settings.nordEtOuest);
   const updateOrderDelivery = useCatalogStore((s) => s.updateOrderDelivery);
+  const updateOrder = useCatalogStore((s) => s.updateOrder);
+  const products = useCatalogStore((s) => s.products);
+  const getShippingFee = useSettingsStore((s) => s.getShippingFee);
+  const freeShippingThreshold = useSettingsStore((s) => s.settings.freeShippingThreshold);
 
   const [dispatching, setDispatching] = useState<"ecotrack" | "nord_ouest" | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editedOrder, setEditedOrder] = useState<Order | null>(null);
   const [dispatchResult, setDispatchResult] = useState<{
     company: string;
     trackingCode: string;
@@ -166,7 +176,92 @@ export function OrderDetailModal({
     window.print();
   }
 
-  const alreadyDispatched = Boolean(order.trackingCode);
+  const alreadyDispatched = !canEditOrder(order.trackingCode, order.deliveryDispatchedAt);
+  const editWilaya = editedOrder
+    ? ALGERIA_WILAYAS.find((wilaya) =>
+        [wilaya.nameAr, wilaya.nameFr, wilaya.code].some((name) => editedOrder.wilaya === name),
+      )
+    : undefined;
+  const editedTotals = editedOrder
+      ? calculateOrderTotals(
+          editedOrder.items,
+          editedOrder.wilaya,
+          editedOrder.isStopdesk ?? false,
+          freeShippingThreshold,
+          getShippingFee,
+          editedOrder.subtotal,
+        )
+      : null;
+
+  function beginEditing() {
+    if (!order) return;
+    const wilaya = ALGERIA_WILAYAS.find((item) =>
+      [item.nameAr, item.nameFr, item.code].some((name) => order.wilaya === name),
+    );
+    setEditedOrder({
+      ...order,
+      wilaya: wilaya?.nameAr ?? order.wilaya,
+      items: order.items.map((item) => ({ ...item })),
+    });
+    setEditError("");
+    setEditing(true);
+  }
+
+  function updateEditedItem(itemId: string, patch: Partial<OrderItem>) {
+    setEditedOrder((current) => {
+      if (!current) return current;
+      const items = current.items.map((item) =>
+        item.id === itemId ? { ...item, ...patch } : item,
+      );
+      const totals = calculateOrderTotals(
+        items,
+        current.wilaya,
+        current.isStopdesk ?? false,
+        freeShippingThreshold,
+        getShippingFee,
+        current.subtotal,
+      );
+      return { ...current, items, ...totals };
+    });
+  }
+
+  async function saveEditedOrder() {
+    if (!editedOrder) return;
+    setSavingEdit(true);
+    setEditError("");
+    const totals = calculateOrderTotals(
+      editedOrder.items,
+      editedOrder.wilaya,
+      editedOrder.isStopdesk ?? false,
+      freeShippingThreshold,
+      getShippingFee,
+      editedOrder.subtotal,
+    );
+    const nextOrder = {
+      ...editedOrder,
+      ...totals,
+    };
+    try {
+      await updateOrder(nextOrder);
+      onOrderSaved(nextOrder);
+      setEditing(false);
+      toast(locale === "ar" ? "تم حفظ تعديلات الطلب." : "Commande mise à jour.");
+    } catch (error) {
+      console.error("Failed to update order details", error);
+      const message =
+        error instanceof Error && error.message.includes("ORDER_ALREADY_DISPATCHED")
+          ? locale === "ar"
+            ? "لا يمكن تعديل طلب أُرسل إلى شركة التوصيل."
+            : "Une commande déjà expédiée ne peut pas être modifiée."
+          : locale === "ar"
+            ? "تعذر حفظ التعديلات. تحقق من الاتصال والترحيل 0007."
+            : "Échec de l’enregistrement. Vérifiez la connexion et la migration 0007.";
+      setEditError(message);
+      toast(message);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 backdrop-blur-sm sm:p-4">
@@ -345,12 +440,115 @@ export function OrderDetailModal({
             <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-zinc-500">
               {locale === "ar" ? "بيانات العميل والتوصيل" : "Client & Livraison"}
             </h3>
+            {!alreadyDispatched && (
+              <button
+                type="button"
+                onClick={editing ? () => setEditing(false) : beginEditing}
+                className="mb-3 rounded-lg border border-purple-300 px-3 py-1.5 text-xs font-bold text-purple-800 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-300 dark:hover:bg-purple-950/30"
+              >
+                {editing
+                  ? locale === "ar" ? "إلغاء التعديل" : "Annuler"
+                  : locale === "ar" ? "تعديل بيانات الطلب" : "Modifier la commande"}
+              </button>
+            )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex items-center gap-2 text-sm">
                 <User size={16} className="text-zinc-400" />
                 <span className="font-bold">{order.customerName}</span>
               </div>
+
+              {editing && editedOrder && (
+                <section className="space-y-4 rounded-xl border border-purple-200 bg-purple-50/70 p-4 dark:border-purple-900 dark:bg-purple-950/20" dir={locale === "ar" ? "rtl" : "ltr"}>
+                  <h3 className="text-sm font-bold text-purple-950 dark:text-purple-200">
+                    {locale === "ar" ? "تعديل بيانات العميل والتوصيل والخيارات" : "Modifier le client, la livraison et les options"}
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="space-y-1 text-xs font-semibold">
+                      <span>{locale === "ar" ? "اسم العميل" : "Nom du client"}</span>
+                      <input value={editedOrder.customerName} onChange={(event) => setEditedOrder({ ...editedOrder, customerName: event.target.value })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" />
+                    </label>
+                    <label className="space-y-1 text-xs font-semibold">
+                      <span>{locale === "ar" ? "الهاتف" : "Téléphone"}</span>
+                      <input value={editedOrder.phone} onChange={(event) => setEditedOrder({ ...editedOrder, phone: event.target.value })} dir="ltr" className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" />
+                    </label>
+                    <label className="space-y-1 text-xs font-semibold">
+                      <span>{locale === "ar" ? "الولاية" : "Wilaya"}</span>
+                      <select
+                        value={editWilaya?.nameAr ?? editedOrder.wilaya}
+                        onChange={(event) => setEditedOrder({ ...editedOrder, wilaya: event.target.value, commune: "" })}
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                      >
+                        {!editWilaya && <option value={editedOrder.wilaya}>{editedOrder.wilaya}</option>}
+                        {ALGERIA_WILAYAS.map((wilaya) => <option key={wilaya.code} value={wilaya.nameAr}>{locale === "ar" ? wilaya.nameAr : wilaya.nameFr}</option>)}
+                      </select>
+                    </label>
+                    <label className="space-y-1 text-xs font-semibold">
+                      <span>{locale === "ar" ? "البلدية" : "Commune"}</span>
+                      {(ALGERIA_WILAYAS.find((wilaya) => wilaya.nameAr === editedOrder.wilaya)?.communes ?? []).length > 0 ? (
+                        <select value={editedOrder.commune} onChange={(event) => setEditedOrder({ ...editedOrder, commune: event.target.value })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
+                          {!ALGERIA_WILAYAS.find((wilaya) => wilaya.nameAr === editedOrder.wilaya)?.communes.includes(editedOrder.commune) && <option value={editedOrder.commune}>{editedOrder.commune}</option>}
+                          {ALGERIA_WILAYAS.find((wilaya) => wilaya.nameAr === editedOrder.wilaya)?.communes.map((commune) => <option key={commune} value={commune}>{commune}</option>)}
+                        </select>
+                      ) : (
+                        <input value={editedOrder.commune} onChange={(event) => setEditedOrder({ ...editedOrder, commune: event.target.value })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" />
+                      )}
+                    </label>
+                    <label className="space-y-1 text-xs font-semibold sm:col-span-2">
+                      <span>{locale === "ar" ? "العنوان" : "Adresse"}</span>
+                      <input value={editedOrder.address} onChange={(event) => setEditedOrder({ ...editedOrder, address: event.target.value })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" />
+                    </label>
+                    <label className="space-y-1 text-xs font-semibold">
+                      <span>{locale === "ar" ? "طريقة التوصيل" : "Mode de livraison"}</span>
+                      <select value={editedOrder.isStopdesk ? "desk" : "home"} onChange={(event) => setEditedOrder({ ...editedOrder, isStopdesk: event.target.value === "desk" })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
+                        <option value="home">{locale === "ar" ? "توصيل للمنزل" : "À domicile"}</option>
+                        <option value="desk">{locale === "ar" ? "استلام من المكتب" : "Point relais"}</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold">{locale === "ar" ? "المقاس واللون" : "Taille et couleur"}</h4>
+                    {editedOrder.items.map((item) => {
+                      const product = products.find((entry) => entry.id === item.productId);
+                      const variants = product?.variants ?? [];
+                      return (
+                        <div key={item.id} className="grid gap-2 rounded-lg border border-purple-100 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900 sm:grid-cols-[1fr_2fr]">
+                          <p className="self-center text-xs font-bold">{item.name[locale] || item.name.ar}</p>
+                          {variants.length ? (
+                            <select
+                              value={item.variantId}
+                              onChange={(event) => {
+                                const variant = variants.find((entry) => entry.id === event.target.value);
+                                if (variant) updateEditedItem(item.id, { variantId: variant.id, size: variant.size, color: variant.color });
+                              }}
+                              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                            >
+                              {!variants.some((variant) => variant.id === item.variantId) && <option value={item.variantId}>{item.size} · {item.color[locale] || item.color.ar}</option>}
+                              {variants.map((variant) => <option key={variant.id} value={variant.id}>{variant.size} · {variant.color[locale] || variant.color.ar} ({locale === "ar" ? `المخزون ${variant.stock}` : `Stock ${variant.stock}`})</option>)}
+                            </select>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-2">
+                              <input aria-label={locale === "ar" ? "المقاس" : "Taille"} value={item.size} onChange={(event) => updateEditedItem(item.id, { size: event.target.value, variantId: "" })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" />
+                              <input aria-label={locale === "ar" ? "اللون" : "Couleur"} value={item.color[locale] || item.color.ar} onChange={(event) => updateEditedItem(item.id, { color: { ...item.color, [locale]: event.target.value }, variantId: "" })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-purple-200 pt-3 dark:border-purple-900">
+                    <p className="text-xs font-semibold">
+                      {locale === "ar" ? "الإجمالي بعد التعديل: " : "Total après modification : "}
+                      {formatPrice(editedTotals?.total ?? editedOrder.total, locale)}
+                    </p>
+                    <button type="button" disabled={savingEdit} onClick={() => void saveEditedOrder()} className="rounded-lg bg-purple-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-60">
+                      {savingEdit ? (locale === "ar" ? "جارٍ الحفظ..." : "Enregistrement...") : (locale === "ar" ? "حفظ التعديلات" : "Enregistrer")}
+                    </button>
+                  </div>
+                  {editError && <p role="alert" className="text-xs font-semibold text-red-700 dark:text-red-300">{editError}</p>}
+                </section>
+              )}
 
               <div className="flex items-center gap-2 text-sm">
                 <Phone size={16} className="text-emerald-600" />

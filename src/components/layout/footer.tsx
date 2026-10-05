@@ -6,10 +6,13 @@ import { STORE_NAME } from "@/lib/constants";
 import { useLocale } from "@/providers/locale-provider";
 import { LocaleLink } from "@/components/layout/language-switcher";
 import { toast } from "@/components/ui/toast";
+import { useSettingsStore } from "@/stores/settings-store";
 
 export function Footer() {
   const { dict } = useLocale();
   const pathname = usePathname();
+  const storefront = useSettingsStore((state) => state.settings.storefront);
+  const storeName = storefront.storeName.trim() || STORE_NAME;
   const hasMobileBottomNav = !pathname.includes("/admin") && !pathname.includes("/checkout");
   const [email, setEmail] = useState("");
 
@@ -24,7 +27,8 @@ export function Footer() {
     <footer className={`mt-auto border-t border-line bg-cream-2 ${hasMobileBottomNav ? "pb-20 md:pb-0" : ""}`}>
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:gap-10 sm:px-5 sm:py-14 md:grid-cols-4 md:px-8">
         <div>
-          <p className="font-serif text-2xl tracking-[0.24em]">{STORE_NAME}</p>
+          <p className="font-serif text-2xl tracking-[0.24em]">{storeName}</p>
+          {storefront.storeTagline ? <p className="mt-2 text-sm text-muted">{storefront.storeTagline}</p> : null}
           <p className="mt-4 max-w-xs text-sm leading-6 text-muted">{dict.hero.subtitle}</p>
           <p className="mt-4 text-sm text-muted">{dict.footer.address}</p>
           <p className="text-sm text-muted">{dict.footer.phone}</p>
@@ -76,7 +80,7 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t border-line px-5 py-4 text-center text-xs text-muted md:px-8">
-        © {new Date().getFullYear()} {STORE_NAME}. {dict.footer.rights}
+        © {new Date().getFullYear()} {storeName}. {dict.footer.rights}
       </div>
     </footer>
   );

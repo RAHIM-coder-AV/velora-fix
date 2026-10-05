@@ -10,7 +10,7 @@ import type {
   Review,
   AbandonedCheckout,
 } from "@/types";
-import type { PixelSettings } from "@/types/settings";
+import type { PixelSettings, SharedStoreSettings } from "@/types/settings";
 import { categories as seedCategories } from "@/lib/catalog/seed";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -24,6 +24,33 @@ interface CategoryRow {
   description_fr: string;
   description_ar: string;
   image: string;
+}
+
+export async function fetchSharedStoreSettings(
+  sb: SupabaseClient,
+): Promise<Partial<SharedStoreSettings> | null> {
+  const { data, error } = await sb
+    .from("storefront_configuration")
+    .select("configuration")
+    .eq("id", "default")
+    .maybeSingle();
+  if (error) throw error;
+  return (data?.configuration as Partial<SharedStoreSettings> | undefined) ?? null;
+}
+
+export async function saveSharedStoreSettings(
+  sb: SupabaseClient,
+  settings: SharedStoreSettings,
+): Promise<void> {
+  const { error } = await sb.from("storefront_configuration").upsert(
+    {
+      id: "default",
+      configuration: settings,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "id" },
+  );
+  if (error) throw error;
 }
 
 interface ProductRow {
@@ -42,6 +69,42 @@ interface ProductRow {
   is_new: boolean;
   offers: ProductOffer[] | null;
   created_at: string;
+}
+
+export async function upsertCategory(sb: SupabaseClient, category: Category): Promise<string> {
+  const row: Record<string, unknown> = {
+    slug: category.slug,
+    name_fr: category.name.fr,
+    name_ar: category.name.ar,
+    description_fr: category.description.fr,
+    description_ar: category.description.ar,
+    image: category.image,
+  };
+  if (UUID_RE.test(category.id)) row.id = category.id;
+  const { data, error } = await sb
+    .from("categories")
+    .upsert(row, { onConflict: UUID_RE.test(category.id) ? "id" : "slug" })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+export async function deleteCategory(sb: SupabaseClient, id: string): Promise<void> {
+  const { count, error: countError } = await sb
+    .from("products")
+    .select("id", { count: "exact", head: true })
+    .eq("category_id", id);
+  if (countError) throw countError;
+  if ((count ?? 0) > 0) throw new Error("CATEGORY_IN_USE");
+  const { data, error } = await sb
+    .from("categories")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("CATEGORY_NOT_FOUND_OR_FORBIDDEN");
 }
 
 interface ImageRow {
@@ -116,6 +179,7 @@ interface OrderRow {
   subtotal: number;
   shipping: number;
   total: number;
+  is_stopdesk: boolean;
   delivery_company: string | null;
   tracking_code: string | null;
   delivery_dispatched_at: string | null;
@@ -224,6 +288,7 @@ const mapOrder = (r: OrderRow): Order => ({
   subtotal: r.subtotal,
   shipping: r.shipping,
   total: r.total,
+  isStopdesk: Boolean(r.is_stopdesk || /استلام من المكتب|Stop\s*Desk/i.test(r.address)),
   deliveryCompany: r.delivery_company ?? undefined,
   trackingCode: r.tracking_code ?? undefined,
   deliveryDispatchedAt: r.delivery_dispatched_at ?? undefined,
@@ -297,6 +362,7 @@ export async function placeOrder(
     subtotal: order.subtotal,
     shipping: order.shipping,
     total: order.total,
+    is_stopdesk: order.isStopdesk ?? false,
     items: order.items.map((i) => ({
       product_id: i.productId,
       variant_id: i.variantId,
@@ -348,6 +414,31 @@ export async function fetchOrders(sb: SupabaseClient, opts: { all?: boolean } = 
 
 export async function updateOrderStatus(sb: SupabaseClient, id: string, status: OrderStatus) {
   const { error } = await sb.from("orders").update({ status }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateOrderDetails(sb: SupabaseClient, order: Order): Promise<void> {
+  const { error } = await sb.rpc("admin_update_order_details", {
+    p_order_id: order.id,
+    p_customer_name: order.customerName,
+    p_phone: order.phone,
+    p_wilaya: order.wilaya,
+    p_commune: order.commune,
+    p_address: order.address,
+    p_is_stopdesk: order.isStopdesk ?? false,
+    p_subtotal: order.subtotal,
+    p_shipping: order.shipping,
+    p_total: order.total,
+    p_items: order.items.map((item) => ({
+      id: item.id,
+      variant_id: item.variantId || null,
+      size: item.size,
+      color_fr: item.color.fr,
+      color_ar: item.color.ar,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+    })),
+  });
   if (error) throw error;
 }
 
@@ -738,6 +829,7 @@ export async function saveAbandonedCheckout(
     p_phone: draft.phone ?? null,
     p_wilaya: draft.wilaya ?? null,
     p_commune: draft.commune ?? null,
+    p_items: draft.items ?? [],
   });
   if (error) throw error;
 }
@@ -767,6 +859,7 @@ interface AbandonedCheckoutRow {
   phone: string | null;
   wilaya: string | null;
   commune: string | null;
+  items: AbandonedCheckout["items"];
   created_at: string;
   expires_at: string;
 }
@@ -774,7 +867,7 @@ interface AbandonedCheckoutRow {
 export async function fetchAbandonedCheckouts(sb: SupabaseClient): Promise<AbandonedCheckout[]> {
   const { data, error } = await sb
     .from("abandoned_checkouts")
-    .select("session_id, product_id, product_name, size, color, quantity, value, contact_consent, customer_name, phone, wilaya, commune, created_at, expires_at")
+    .select("session_id, product_id, product_name, size, color, quantity, value, contact_consent, customer_name, phone, wilaya, commune, items, created_at, expires_at")
     .eq("status", "open")
     .gt("expires_at", new Date().toISOString())
     .order("updated_at", { ascending: false });
@@ -792,6 +885,7 @@ export async function fetchAbandonedCheckouts(sb: SupabaseClient): Promise<Aband
     phone: row.phone ?? undefined,
     wilaya: row.wilaya ?? undefined,
     commune: row.commune ?? undefined,
+    items: Array.isArray(row.items) ? row.items : undefined,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
   }));

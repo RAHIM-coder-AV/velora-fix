@@ -103,6 +103,7 @@ create table if not exists public.orders (
   subtotal integer not null,
   shipping integer not null,
   total integer not null,
+  is_stopdesk boolean not null default false,
   delivery_company text,
   tracking_code text,
   delivery_dispatched_at timestamptz,
@@ -225,6 +226,25 @@ create table if not exists public.store_pixel_settings (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.storefront_configuration (
+  id text primary key check (id = 'default'),
+  configuration jsonb not null default '{}'::jsonb
+    check (jsonb_typeof(configuration) = 'object' and pg_column_size(configuration) <= 131072),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.storefront_configuration enable row level security;
+create policy "public read storefront configuration"
+  on public.storefront_configuration for select using (true);
+create policy "admin insert storefront configuration"
+  on public.storefront_configuration for insert with check (public.is_admin());
+create policy "admin update storefront configuration"
+  on public.storefront_configuration for update
+  using (public.is_admin()) with check (public.is_admin());
+revoke all on public.storefront_configuration from anon, authenticated;
+grant select on public.storefront_configuration to anon, authenticated;
+grant insert, update on public.storefront_configuration to authenticated;
+
 insert into public.store_pixel_settings (id)
 values ('default')
 on conflict (id) do nothing;
@@ -250,6 +270,7 @@ create table if not exists public.abandoned_checkouts (
   phone text,
   wilaya text,
   commune text,
+  items jsonb not null default '[]'::jsonb,
   status text not null default 'open' check (status in ('open', 'converted')),
   order_reference text,
   created_at timestamptz not null default now(),
@@ -284,7 +305,8 @@ create or replace function public.save_abandoned_checkout(
   p_customer_name text default null,
   p_phone text default null,
   p_wilaya text default null,
-  p_commune text default null
+  p_commune text default null,
+  p_items jsonb default '[]'::jsonb
 )
 returns void
 language plpgsql
@@ -298,18 +320,20 @@ begin
     or p_value < 0
     or length(coalesce(p_size, '')) > 40
     or length(coalesce(p_color, '')) > 80
+    or p_items is null or jsonb_typeof(p_items) <> 'array'
+    or jsonb_array_length(p_items) > 50 or pg_column_size(p_items) > 65536
   then
     raise exception 'INVALID_CHECKOUT_DRAFT';
   end if;
 
   delete from public.abandoned_checkouts where expires_at < now();
   insert into public.abandoned_checkouts (
-    session_id, product_id, product_name, size, color, quantity, value,
+    session_id, product_id, product_name, size, color, quantity, value, items,
     contact_consent, customer_name, phone, wilaya, commune, updated_at, expires_at
   )
   values (
     p_session_id, p_product_id, p_product_name, coalesce(p_size, ''),
-    coalesce(p_color, ''), p_quantity, p_value, coalesce(p_contact_consent, false),
+    coalesce(p_color, ''), p_quantity, p_value, p_items, coalesce(p_contact_consent, false),
     case when p_contact_consent then left(nullif(trim(p_customer_name), ''), 120) end,
     case
       when p_contact_consent and trim(coalesce(p_phone, '')) ~ '^\+?[0-9 ()-]{8,24}$'
@@ -326,6 +350,7 @@ begin
     color = excluded.color,
     quantity = excluded.quantity,
     value = excluded.value,
+    items = excluded.items,
     contact_consent = excluded.contact_consent,
     customer_name = excluded.customer_name,
     phone = excluded.phone,
@@ -376,9 +401,9 @@ begin
 end;
 $$;
 
-revoke all on function public.save_abandoned_checkout(uuid, text, text, text, text, integer, integer, boolean, text, text, text, text) from public;
+revoke all on function public.save_abandoned_checkout(uuid, text, text, text, text, integer, integer, boolean, text, text, text, text, jsonb) from public;
 revoke all on function public.complete_abandoned_checkout(uuid, text) from public;
 revoke all on function public.place_order_with_checkout(jsonb) from public;
-grant execute on function public.save_abandoned_checkout(uuid, text, text, text, text, integer, integer, boolean, text, text, text, text) to anon, authenticated;
+grant execute on function public.save_abandoned_checkout(uuid, text, text, text, text, integer, integer, boolean, text, text, text, text, jsonb) to anon, authenticated;
 grant execute on function public.complete_abandoned_checkout(uuid, text) to anon, authenticated;
 grant execute on function public.place_order_with_checkout(jsonb) to anon, authenticated;

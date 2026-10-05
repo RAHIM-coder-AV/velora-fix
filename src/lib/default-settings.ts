@@ -74,4 +74,38 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     tiktokPixelIds: Array(4).fill(""),
     tiktokPixelEnabled: Array(4).fill(false),
   },
+  storefront: {
+    storeName: "VELORA",
+    storeTagline: "",
+    logoUrl: "",
+    checkout: {
+      showEmail: false,
+      showNotes: true,
+      intro: {
+        ar: "أدخل معلوماتك لتأكيد الطلب.",
+        fr: "Renseignez vos informations pour confirmer la commande.",
+      },
+    },
+    productForm: {
+      intro: {
+        ar: "املأ الاستمارة في الأسفل لتقديم طلبك.",
+        fr: "Remplissez le formulaire ci-dessous pour commander.",
+      },
+      showAddress: true,
+    },
+    thankYou: {
+      title: {
+        ar: "شكراً لطلبك",
+        fr: "Merci pour votre commande",
+      },
+      body: {
+        ar: "تم استلام طلبك رقم {ref}. سنتصل بك قريباً لتأكيده.",
+        fr: "Votre commande {ref} a bien été reçue. Nous vous contacterons bientôt pour la confirmer.",
+      },
+      buttonLabel: {
+        ar: "العودة إلى المتجر",
+        fr: "Retour à la boutique",
+      },
+    },
+  },
 };

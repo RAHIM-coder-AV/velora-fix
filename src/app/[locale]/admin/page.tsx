@@ -53,6 +53,8 @@ export default function AdminPage() {
   const deleteAllProducts = useCatalogStore((s) => s.deleteAllProducts);
   const toggleProductActive = useCatalogStore((s) => s.toggleProductActive);
   const importLocalProducts = useCatalogStore((s) => s.importLocalProducts);
+  const upsertCategory = useCatalogStore((s) => s.upsertCategory);
+  const deleteCategory = useCatalogStore((s) => s.deleteCategory);
   const setOrderStatus = useCatalogStore((s) => s.setOrderStatus);
   const deleteOrder = useCatalogStore((s) => s.deleteOrder);
   const refreshOrders = useCatalogStore((s) => s.refreshOrders);
@@ -480,7 +482,17 @@ export default function AdminPage() {
           </div>
         )}
 
-        {activeTab === "settings" && <AdminSettingsView />}
+        {activeTab === "settings" && (
+          <AdminSettingsView
+            categories={categories}
+            onSaveCategory={upsertCategory}
+            onDeleteCategory={deleteCategory}
+            onOpenHomepage={() => {
+              setActiveTab("products");
+              window.setTimeout(() => document.getElementById("homepage-editor")?.scrollIntoView({ behavior: "smooth" }), 100);
+            }}
+          />
+        )}
       </main>
       </div>
     </div>

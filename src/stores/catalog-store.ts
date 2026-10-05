@@ -374,6 +374,9 @@ interface CatalogState {
   refreshAbandonedCheckouts: () => Promise<void>;
   saveAbandonedCheckout: (draft: AbandonedCheckout) => Promise<void>;
   completeAbandonedCheckout: (sessionId: string, orderReference: string) => Promise<void>;
+  convertAbandonedCheckout: (draft: AbandonedCheckout, order: Order) => Promise<string>;
+  upsertCategory: (category: Category) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
   upsertProduct: (product: Product) => Promise<void>;
   deleteProduct: (id: string) => Promise<"deleted" | "removed-local">;
   deleteAllProducts: () => Promise<{ deletedFromDatabase: number; removedLocally: number }>;
@@ -381,7 +384,7 @@ interface CatalogState {
   importLocalProducts: () => Promise<ImportLocalProductsResult>;
   updateProductOffers: (productId: string, offers: ProductOffer[]) => void;
   addOrder: (order: Order) => void;
-  updateOrder: (order: Order) => void;
+  updateOrder: (order: Order) => Promise<void>;
   deleteOrder: (id: string) => void;
   setOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
   bulkSetOrderStatus: (ids: string[], status: OrderStatus) => void;
@@ -473,7 +476,73 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     const client = sb();
     const updated = get().abandonedCheckouts.filter((item) => item.sessionId !== sessionId);
     set({ abandonedCheckouts: updated });
-    if (!client) saveAbandonedCheckouts(updated);
+    if (client) {
+      await db.completeAbandonedCheckout(client, sessionId, orderReference);
+    } else {
+      saveAbandonedCheckouts(updated);
+    }
+  },
+  convertAbandonedCheckout: async (draft, order) => {
+    const client = sb();
+    if (client) {
+      const reference = await db.placeOrder(client, order, draft.sessionId);
+      await Promise.all([get().refreshOrders(true), get().refreshAbandonedCheckouts()]);
+      return reference;
+    }
+    const reservation = new Map<string, { productId: string; quantity: number; stock: number }>();
+    for (const item of order.items) {
+      const product = get().products.find((candidate) => candidate.id === item.productId);
+      const variant = product?.variants.find((candidate) => candidate.id === item.variantId);
+      if (!variant) {
+        throw new Error("VARIANT_NOT_FOUND_OR_OUT_OF_STOCK");
+      }
+      const current = reservation.get(item.variantId) ?? {
+        productId: item.productId,
+        quantity: 0,
+        stock: variant.stock,
+      };
+      current.quantity += item.quantity;
+      reservation.set(item.variantId, current);
+    }
+    for (const [variantId, item] of reservation) {
+      if (item.stock < item.quantity) {
+        throw new Error("VARIANT_NOT_FOUND_OR_OUT_OF_STOCK");
+      }
+      await get().setVariantStock(item.productId, variantId, item.stock - item.quantity);
+    }
+    const completedOrder = { ...order };
+    get().addOrder(completedOrder);
+    await get().completeAbandonedCheckout(draft.sessionId, completedOrder.reference);
+    return completedOrder.reference;
+  },
+  upsertCategory: async (category) => {
+    const client = sb();
+    if (client) {
+      await db.upsertCategory(client, category);
+      await get().refresh();
+      return;
+    }
+    const current = get().categories;
+    const exists = current.some((item) => item.id === category.id);
+    set({
+      categories: exists
+        ? current.map((item) => item.id === category.id ? category : item)
+        : [...current, category],
+    });
+  },
+  deleteCategory: async (id) => {
+    if (get().products.some((product) => product.categoryId === id)) {
+      throw new Error("CATEGORY_IN_USE");
+    }
+    const client = sb();
+    if (client) {
+      await db.deleteCategory(client, id);
+      await get().refresh();
+      return;
+    }
+    set((state) => ({
+      categories: state.categories.filter((category) => category.id !== id),
+    }));
   },
   upsertProduct: async (product) => {
     const client = sb();
@@ -601,7 +670,11 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     set({ orders: updated });
     saveOrders(updated);
   },
-  updateOrder: (order) => {
+  updateOrder: async (order) => {
+    const client = sb();
+    if (client && UUID_RE.test(order.id)) {
+      await db.updateOrderDetails(client, order);
+    }
     const updated = get().orders.map((o) => (o.id === order.id ? order : o));
     set({ orders: updated });
     saveOrders(updated);

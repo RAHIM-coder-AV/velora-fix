@@ -31,6 +31,26 @@ export interface PixelSettings {
   tiktokPixelEnabled: boolean[];
 }
 
+export interface StorefrontConfiguration {
+  storeName: string;
+  storeTagline: string;
+  logoUrl: string;
+  checkout: {
+    showEmail: boolean;
+    showNotes: boolean;
+    intro: { ar: string; fr: string };
+  };
+  productForm: {
+    intro: { ar: string; fr: string };
+    showAddress: boolean;
+  };
+  thankYou: {
+    title: { ar: string; fr: string };
+    body: { ar: string; fr: string };
+    buttonLabel: { ar: string; fr: string };
+  };
+}
+
 export interface StoreSettings {
   shippingType: "custom" | "fixed" | "free";
   defaultHomePrice: number;
@@ -40,4 +60,15 @@ export interface StoreSettings {
   ecotrack: EcoTrackSettings;
   nordEtOuest: NordEtOuestSettings;
   pixels: PixelSettings;
+  storefront: StorefrontConfiguration;
 }
+
+export type SharedStoreSettings = Pick<
+  StoreSettings,
+  | "shippingType"
+  | "defaultHomePrice"
+  | "defaultDeskPrice"
+  | "freeShippingThreshold"
+  | "wilayaPrices"
+  | "storefront"
+>;

@@ -2,12 +2,13 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { StoreSettings, WilayaDeliveryPrice } from "@/types/settings";
+import type { SharedStoreSettings, StoreSettings, WilayaDeliveryPrice } from "@/types/settings";
 import { DEFAULT_STORE_SETTINGS } from "@/lib/default-settings";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
 import * as db from "@/lib/supabase/data";
 import { normalizePixelSettings } from "@/lib/analytics/pixels";
+import { mergeStorefrontConfiguration } from "@/lib/settings/storefront";
 
 interface SettingsState {
   settings: StoreSettings;
@@ -18,6 +19,8 @@ interface SettingsState {
   updateNordEtOuest: (nordEtOuest: Partial<StoreSettings["nordEtOuest"]>) => void;
   updatePixels: (pixels: StoreSettings["pixels"]) => Promise<void>;
   refreshPixels: () => Promise<void>;
+  refreshSharedSettings: () => Promise<void>;
+  saveSharedSettings: () => Promise<void>;
   getShippingFee: (wilayaValue: string, deliveryType: "home" | "desk") => number;
 }
 
@@ -104,6 +107,38 @@ export const useSettingsStore = create<SettingsState>()(
         }));
       },
 
+      refreshSharedSettings: async () => {
+        const client = isSupabaseConfigured() ? createClient() : null;
+        if (!client) return;
+        const shared = await db.fetchSharedStoreSettings(client);
+        if (!shared) return;
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            ...shared,
+            ecotrack: state.settings.ecotrack,
+            nordEtOuest: state.settings.nordEtOuest,
+            pixels: state.settings.pixels,
+            storefront: mergeStorefrontConfiguration(shared.storefront),
+          },
+        }));
+      },
+
+      saveSharedSettings: async () => {
+        const client = isSupabaseConfigured() ? createClient() : null;
+        if (!client) return;
+        const current = get().settings;
+        const shared: SharedStoreSettings = {
+          shippingType: current.shippingType,
+          defaultHomePrice: current.defaultHomePrice,
+          defaultDeskPrice: current.defaultDeskPrice,
+          freeShippingThreshold: current.freeShippingThreshold,
+          wilayaPrices: current.wilayaPrices,
+          storefront: current.storefront,
+        };
+        await db.saveSharedStoreSettings(client, shared);
+      },
+
       getShippingFee: (wilayaValue: string, deliveryType: "home" | "desk") => {
         const { settings } = get();
         if (settings.shippingType === "free") return 0;
@@ -113,7 +148,7 @@ export const useSettingsStore = create<SettingsState>()(
 
         // البحث عن الولاية بالكود أو الاسم
         const prices = settings.wilayaPrices;
-        let matched = Object.values(prices).find(
+        const matched = Object.values(prices).find(
           (w) =>
             wilayaValue.includes(w.code) ||
             wilayaValue.includes(w.nameAr) ||
@@ -129,7 +164,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "velora_store_settings_v1",
-      version: 3,
+      version: 4,
       migrate: (persistedState) => {
         const persisted = persistedState as Partial<SettingsState> | undefined;
         const persistedSettings = persisted?.settings;
@@ -146,9 +181,23 @@ export const useSettingsStore = create<SettingsState>()(
             ...DEFAULT_STORE_SETTINGS,
             ...persistedSettings,
             ecotrack,
-            pixels: DEFAULT_STORE_SETTINGS.pixels,
+            pixels: persistedSettings?.pixels ?? DEFAULT_STORE_SETTINGS.pixels,
+            storefront: mergeStorefrontConfiguration(persistedSettings?.storefront),
           },
         } as SettingsState;
+      },
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<SettingsState> | undefined;
+        return {
+          ...currentState,
+          ...persisted,
+          settings: {
+            ...DEFAULT_STORE_SETTINGS,
+            ...persisted?.settings,
+            storefront: mergeStorefrontConfiguration(persisted?.settings?.storefront),
+            pixels: persisted?.settings?.pixels ?? DEFAULT_STORE_SETTINGS.pixels,
+          },
+        };
       },
     }
   )
