@@ -57,7 +57,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   ecotrack: {
     enabled: true,
     token: "",
-    baseUrl: "https://api.ecotrack.dz/api/v1",
+    baseUrl: "",
     shopId: "",
     autoSendConfirmed: false,
   },

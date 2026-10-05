@@ -129,14 +129,23 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "velora_store_settings_v1",
-      version: 2,
+      version: 3,
       migrate: (persistedState) => {
         const persisted = persistedState as Partial<SettingsState> | undefined;
+        const persistedSettings = persisted?.settings;
+        const ecotrack = {
+          ...DEFAULT_STORE_SETTINGS.ecotrack,
+          ...persistedSettings?.ecotrack,
+        };
+        if (ecotrack.baseUrl === "https://api.ecotrack.dz/api/v1") {
+          ecotrack.baseUrl = "";
+        }
         return {
           ...persisted,
           settings: {
             ...DEFAULT_STORE_SETTINGS,
-            ...persisted?.settings,
+            ...persistedSettings,
+            ecotrack,
             pixels: DEFAULT_STORE_SETTINGS.pixels,
           },
         } as SettingsState;

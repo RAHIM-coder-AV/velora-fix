@@ -39,7 +39,7 @@ export function AdminSettingsView() {
 
   // EcoTrack Local State
   const [ecotrackToken, setEcotrackToken] = useState(settings.ecotrack?.token || "");
-  const [ecotrackUrl, setEcotrackUrl] = useState(settings.ecotrack?.baseUrl || "https://api.ecotrack.dz/api/v1");
+  const [ecotrackUrl, setEcotrackUrl] = useState(settings.ecotrack?.baseUrl || "");
   const [ecotrackEnabled, setEcotrackEnabled] = useState(settings.ecotrack?.enabled ?? true);
   const [ecotrackAutoSend, setEcotrackAutoSend] = useState(settings.ecotrack?.autoSendConfirmed ?? false);
   const [isTestingEcoTrack, setIsTestingEcoTrack] = useState(false);
@@ -111,18 +111,34 @@ export function AdminSettingsView() {
         url.port ||
         url.search ||
         url.hash ||
-        (url.hostname !== "ecotrack.dz" && !url.hostname.endsWith(".ecotrack.dz"))
+        !url.hostname.endsWith(".ecotrack.dz") ||
+        url.hostname === "api.ecotrack.dz"
       ) {
         toast(locale === "ar"
-          ? "تحقق من تفعيل الربط، والرمز الحقيقي، ورابط EcoTrack الآمن."
-          : "Vérifiez l'activation, le jeton réel et l'URL EcoTrack sécurisée.");
+          ? "أدخل رمز API حقيقيًا ورابط شركة التوصيل التي تستخدم EcoTrack، مثل https://dhd.ecotrack.dz/api/v1."
+          : "Saisissez un vrai jeton API et l'URL du transporteur EcoTrack, par ex. https://dhd.ecotrack.dz/api/v1.");
         return;
       }
-      toast(locale === "ar"
-        ? "الإعدادات مكتملة. هذا الفحص لا يتصل بحسابك ولا ينشئ شحنة؛ تأكد من الربط برفع طلب حقيقي."
-        : "Configuration complète. Aucun appel ni envoi n'est effectué par ce contrôle.");
+      const response = await fetch("/api/delivery/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company: "ecotrack",
+          token,
+          baseUrl: ecotrackUrl.trim(),
+        }),
+      });
+      const result = await response.json();
+      toast(
+        response.ok && result.success
+          ? locale === "ar"
+            ? "✅ تم الاتصال بـ EcoTrack والتحقق من صلاحية الرمز."
+            : "✅ Connexion EcoTrack et jeton vérifiés."
+          : result.error ||
+              (locale === "ar" ? "تعذر التحقق من اتصال EcoTrack." : "Impossible de vérifier EcoTrack."),
+      );
     } catch {
-      toast(locale === "ar" ? "رابط EcoTrack غير صالح." : "URL EcoTrack invalide.");
+      toast(locale === "ar" ? "تعذر الوصول إلى خادم فحص EcoTrack." : "Impossible de joindre le vérificateur EcoTrack.");
     } finally {
       setIsTestingEcoTrack(false);
     }
@@ -469,9 +485,14 @@ export function AdminSettingsView() {
                   type="text"
                   value={ecotrackUrl}
                   onChange={(e) => setEcotrackUrl(e.target.value)}
-                  placeholder="https://api.ecotrack.dz/api/v1"
+                  placeholder="https://dhd.ecotrack.dz/api/v1"
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 font-mono text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800"
                 />
+                <p className="mt-1 text-[10px] text-zinc-400">
+                  {locale === "ar"
+                    ? "استخدم نطاق شركة التوصيل التي تتعامل معها (مثل dhd.ecotrack.dz أو packers.ecotrack.dz)، وليس api.ecotrack.dz."
+                    : "Utilisez le domaine de votre transporteur (ex. dhd.ecotrack.dz), pas api.ecotrack.dz."}
+                </p>
               </div>
 
               {/* Auto send on confirm */}
@@ -506,7 +527,7 @@ export function AdminSettingsView() {
                   ) : (
                     <CheckCircle2 size={14} />
                   )}
-                  <span>{locale === "ar" ? "فحص الإعدادات" : "Vérifier la configuration"}</span>
+                  <span>{locale === "ar" ? "اختبار الاتصال" : "Tester la connexion"}</span>
                 </button>
                 <button
                   type="button"

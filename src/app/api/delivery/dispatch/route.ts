@@ -55,7 +55,9 @@ function getProviderConfig(company: string, baseUrl: string) {
 
   if (
     url.protocol !== "https:" ||
-    (url.hostname !== root && !url.hostname.endsWith(suffix)) ||
+    (company === "ecotrack"
+      ? !url.hostname.endsWith(suffix) || url.hostname === "api.ecotrack.dz"
+      : url.hostname !== root && !url.hostname.endsWith(suffix)) ||
     url.username ||
     url.password ||
     url.port ||
@@ -65,9 +67,14 @@ function getProviderConfig(company: string, baseUrl: string) {
     return null;
   }
 
+  const path = url.pathname.replace(/\/+$/, "");
+  const apiPath =
+    company === "ecotrack" && !path.endsWith("/api/v1")
+      ? `${path}/api/v1`
+      : path;
   return {
     companyName: company === "ecotrack" ? "EcoTrack" : "Nord Et Ouest",
-    endpoint: `${url.toString().replace(/\/+$/, "")}/create/order`,
+    endpoint: `${url.origin}${apiPath}/create/order`,
   };
 }
 
@@ -77,7 +84,22 @@ function errorMessageFrom(data: unknown, token: string) {
   const nested = record.data && typeof record.data === "object"
     ? (record.data as Record<string, unknown>)
     : undefined;
-  const raw = record.error ?? nested?.error ?? record.message ?? nested?.message;
+  const errors =
+    record.errors && typeof record.errors === "object"
+      ? (record.errors as Record<string, unknown>)
+      : nested?.errors && typeof nested.errors === "object"
+        ? (nested.errors as Record<string, unknown>)
+        : undefined;
+  const firstErrors = errors ? Object.values(errors)[0] : undefined;
+  const validationMessage = Array.isArray(firstErrors)
+    ? firstErrors.find((item): item is string => typeof item === "string")
+    : undefined;
+  const raw =
+    record.error ??
+    nested?.error ??
+    record.message ??
+    nested?.message ??
+    validationMessage;
   if (typeof raw !== "string") return "";
   return raw.replaceAll(token, "[redacted]").slice(0, 300);
 }
@@ -224,7 +246,19 @@ export async function POST(request: Request) {
       continue;
     }
 
-    const cleanPhone = order.phone.replace(/[\s\-_]/g, "");
+    const cleanPhone = order.phone.replace(/\D/g, "");
+    const wilayaCode = Number(order.wilaya.match(/^\s*(\d{1,2})\s*[-–]/)?.[1]);
+    if (company === "ecotrack" && (!Number.isInteger(wilayaCode) || wilayaCode < 1 || wilayaCode > 58)) {
+      results.push({
+        orderId: order.id,
+        reference: order.reference,
+        success: false,
+        deliveryCompany: company,
+        companyName: provider.companyName,
+        error: "تعذر تحديد رقم الولاية. حدّث بيانات الطلب لتتضمن رمز الولاية مثل 16 - الجزائر.",
+      });
+      continue;
+    }
     const itemsList = order.items
       .map((item) => {
         const title =
@@ -251,40 +285,57 @@ export async function POST(request: Request) {
             remarque: order.notes || "طلب متجر Velora",
           }
         : {
-            order_id: order.reference,
-            firstname: order.customerName,
-            familyname: "",
-            contact_phone: cleanPhone,
-            phone2: order.phone2 || "",
-            address: order.address || order.commune,
-            to_wilaya_name: wilayaClean || order.wilaya,
-            to_commune_name: order.commune || wilayaClean,
-            price: order.total,
-            freeshipping: order.shipping === 0,
-            is_stopdesk: order.isStopdesk ? 1 : 0,
-            has_exchange: 0,
-            product_list: itemsList,
-            note: order.notes || "طلب متجر Velora",
+            reference: order.reference,
+            nom_client: order.customerName,
+            telephone: cleanPhone,
+            telephone_2: order.phone2?.replace(/\D/g, "") || "",
+            adresse: order.address || order.commune,
+            commune: order.commune || wilayaClean,
+            code_wilaya: wilayaCode,
+            montant: order.total,
+            remarque: order.notes || "طلب متجر Velora",
+            produit: itemsList,
+            stock: 0,
+            type: 1,
+            stop_desk: order.isStopdesk ? 1 : 0,
           };
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
-      const response = await fetch(provider.endpoint, {
+      const endpoint = new URL(provider.endpoint);
+      const headers: Record<string, string> = {
+        Accept: "application/json",
+        Authorization: `Bearer ${apiToken}`,
+      };
+      let requestBody: string | undefined;
+      if (company === "ecotrack") {
+        for (const [key, value] of Object.entries(payload)) {
+          endpoint.searchParams.set(key, String(value));
+        }
+      } else {
+        headers["Content-Type"] = "application/json";
+        requestBody = JSON.stringify(payload);
+      }
+
+      const response = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiToken}`,
-          "X-Api-Key": apiToken,
-        },
-        body: JSON.stringify(payload),
+        headers,
+        body: requestBody,
         signal: controller.signal,
       });
       const data: unknown = await response.json().catch(() => null);
       const trackingCode = providerTrackingCode(data);
       const explicitFailure = hasProviderError(data);
 
-      if (response.ok && !explicitFailure && trackingCode) {
+      if (
+        response.ok &&
+        !explicitFailure &&
+        data &&
+        typeof data === "object" &&
+        (data as Record<string, unknown>).success === true &&
+        trackingCode
+      ) {
         results.push({
           orderId: order.id,
           reference: order.reference,

@@ -5,7 +5,7 @@ import { POST } from "./route";
 const baseRequest = {
   company: "ecotrack",
   token: "real-test-token-123",
-  baseUrl: "https://api.ecotrack.dz/api/v1",
+  baseUrl: "https://dhd.ecotrack.dz/api/v1",
   orders: [
     {
       id: "order-1",
@@ -53,6 +53,44 @@ test("rejects untrusted endpoints before sending credentials", async () => {
     request({ ...baseRequest, baseUrl: "https://example.com/api/v1" }),
   );
   assert.equal(response.status, 400);
+});
+
+test("uses EcoTrack's query-parameter create contract and bearer authentication", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestUrl: URL | undefined;
+  let requestInit: RequestInit | undefined;
+  globalThis.fetch = async (input, init) => {
+    requestUrl = new URL(input.toString());
+    requestInit = init;
+    return new Response(JSON.stringify({ success: true, tracking: "ECO-12345" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    const response = await POST(request(baseRequest));
+    const body = await response.json();
+    const query = requestUrl?.searchParams;
+    assert.equal(response.status, 200);
+    assert.equal(body.success, true);
+    assert.equal(requestUrl?.pathname, "/api/v1/create/order");
+    assert.equal(requestInit?.method, "POST");
+    assert.equal(requestInit?.body, undefined);
+    assert.equal(
+      new Headers(requestInit?.headers).get("Authorization"),
+      "Bearer real-test-token-123",
+    );
+    assert.equal(query?.get("reference"), "VLR-12345678");
+    assert.equal(query?.get("nom_client"), "Test Customer");
+    assert.equal(query?.get("telephone"), "0555123456");
+    assert.equal(query?.get("commune"), "Alger Centre");
+    assert.equal(query?.get("code_wilaya"), "16");
+    assert.equal(query?.get("montant"), "2500");
+    assert.equal(query?.get("type"), "1");
+    assert.equal(query?.has("price"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("does not report success when the provider rejects the request", async () => {
