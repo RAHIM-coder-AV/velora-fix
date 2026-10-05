@@ -873,10 +873,11 @@ export function AdminOrdersTable({
                         <button
                           type="button"
                           onClick={() => setSelectedOrder(o)}
-                          className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-purple-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                          title={locale === "ar" ? "تفاصيل الطلب ورفع الشحن" : "Détails"}
+                          className="flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-[11px] font-semibold text-zinc-600 hover:bg-zinc-100 hover:text-purple-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                          title={locale === "ar" ? "تفاصيل الطلب والتعديل ورفع الشحن" : "Détails, modification et expédition"}
                         >
                           <Eye size={15} />
+                          <span>{locale === "ar" ? "التفاصيل" : "Détails"}</span>
                         </button>
                         <button
                           type="button"

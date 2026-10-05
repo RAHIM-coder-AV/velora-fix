@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   X,
@@ -12,6 +12,7 @@ import {
   Truck,
   Copy,
   SendHorizonal,
+  Pencil,
 } from "lucide-react";
 import type { Order, OrderItem, OrderStatus } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
@@ -52,10 +53,17 @@ export function OrderDetailModal({
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState("");
   const [editedOrder, setEditedOrder] = useState<Order | null>(null);
+  const editFormRef = useRef<HTMLElement>(null);
   const [dispatchResult, setDispatchResult] = useState<{
     company: string;
     trackingCode: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (editing) {
+      editFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [editing]);
 
   async function handleDispatch(company: "ecotrack" | "nord_ouest") {
     if (!order) return;
@@ -283,6 +291,26 @@ export function OrderDetailModal({
           </div>
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            {alreadyDispatched ? (
+              <span
+                title={locale === "ar" ? "لا يمكن تعديل الطلب بعد إرساله لشركة التوصيل." : "Une commande expédiée ne peut plus être modifiée."}
+                className="rounded-lg bg-zinc-100 px-2 py-1.5 text-[10px] font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 sm:text-xs"
+              >
+                {locale === "ar" ? "تم إرساله" : "Expédiée"}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={editing ? () => setEditing(false) : beginEditing}
+                className="flex items-center gap-1.5 rounded-lg bg-purple-700 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-purple-800 sm:px-3 sm:text-xs"
+                aria-label={locale === "ar" ? "تعديل بيانات الطلب" : "Modifier la commande"}
+              >
+                <Pencil size={14} />
+                <span>{editing
+                  ? locale === "ar" ? "إلغاء" : "Annuler"
+                  : locale === "ar" ? "تعديل الطلب" : "Modifier"}</span>
+              </button>
+            )}
             <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-2 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-100 sm:px-3 sm:text-xs dark:border-zinc-700 dark:text-zinc-300"
@@ -440,18 +468,6 @@ export function OrderDetailModal({
             <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-zinc-500">
               {locale === "ar" ? "بيانات العميل والتوصيل" : "Client & Livraison"}
             </h3>
-            {!alreadyDispatched && (
-              <button
-                type="button"
-                onClick={editing ? () => setEditing(false) : beginEditing}
-                className="mb-3 rounded-lg border border-purple-300 px-3 py-1.5 text-xs font-bold text-purple-800 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-300 dark:hover:bg-purple-950/30"
-              >
-                {editing
-                  ? locale === "ar" ? "إلغاء التعديل" : "Annuler"
-                  : locale === "ar" ? "تعديل بيانات الطلب" : "Modifier la commande"}
-              </button>
-            )}
-
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex items-center gap-2 text-sm">
                 <User size={16} className="text-zinc-400" />
@@ -459,7 +475,7 @@ export function OrderDetailModal({
               </div>
 
               {editing && editedOrder && (
-                <section className="space-y-4 rounded-xl border border-purple-200 bg-purple-50/70 p-4 dark:border-purple-900 dark:bg-purple-950/20" dir={locale === "ar" ? "rtl" : "ltr"}>
+                <section ref={editFormRef} className="space-y-4 rounded-xl border border-purple-200 bg-purple-50/70 p-4 sm:col-span-2 dark:border-purple-900 dark:bg-purple-950/20" dir={locale === "ar" ? "rtl" : "ltr"}>
                   <h3 className="text-sm font-bold text-purple-950 dark:text-purple-200">
                     {locale === "ar" ? "تعديل بيانات العميل والتوصيل والخيارات" : "Modifier le client, la livraison et les options"}
                   </h3>
