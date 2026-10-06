@@ -1,18 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   LayoutDashboard,
   ShoppingBag,
   Package,
-  TrendingUp,
   AlertTriangle,
   ExternalLink,
   ShieldCheck,
   LogOut,
   Settings,
-  Bell,
   Palette,
   Warehouse,
   ChevronLeft,
@@ -20,8 +18,8 @@ import {
 import { useAuthStore } from "@/stores/auth-store";
 import { useCatalogStore } from "@/stores/catalog-store";
 import { useLocale } from "@/providers/locale-provider";
-import { formatPrice } from "@/lib/utils";
 import { AdminOrdersTable } from "@/components/admin/admin-orders-table";
+import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { AdminAbandonedCheckouts } from "@/components/admin/admin-abandoned-checkouts";
 import { isUndeliveredOrder } from "@/lib/orders/abandoned";
 import { AdminProductsTable } from "@/components/admin/admin-products-table";
@@ -60,7 +58,7 @@ export default function AdminPage() {
   const refreshOrders = useCatalogStore((s) => s.refreshOrders);
   const refreshAbandonedCheckouts = useCatalogStore((s) => s.refreshAbandonedCheckouts);
 
-  const [activeTab, setActiveTab] = useState<AdminTab>("orders");
+  const [activeTab, setActiveTab] = useState<AdminTab>("stats");
   const [adminLoginError, setAdminLoginError] = useState("");
 
   async function loginDemoAdmin() {
@@ -97,16 +95,6 @@ export default function AdminPage() {
       });
     }
   }, [ready, user?.role, refreshOrders, refreshAbandonedCheckouts]);
-
-  const totalRevenue = useMemo(
-    () => orders.reduce((sum, o) => sum + (o.status !== "cancelled" ? o.total : 0), 0),
-    [orders]
-  );
-
-  const pendingOrdersCount = useMemo(
-    () => orders.filter((o) => o.status === "pending" || o.status === "processing").length,
-    [orders]
-  );
 
   // If user is not yet logged in as admin, provide 1-click demo admin login
   if (ready && (!user || user.role !== "admin")) {
@@ -314,57 +302,6 @@ export default function AdminPage() {
                 : locale === "ar" ? "نظرة واضحة على نشاط المتجر وإعداداته" : "Vue d’ensemble de l’activité et des paramètres"}
           </p>
         </div>
-        {/* Quick KPI Overview Cards */}
-        <div className="mb-5 grid grid-cols-2 gap-2 sm:mb-6 sm:gap-4 sm:grid-cols-4">
-          <div className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xs sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="flex items-center justify-between text-zinc-400">
-              <span className="text-[11px] font-bold uppercase tracking-wider">
-                {locale === "ar" ? "المبيعات الإجمالية" : "Revenu"}
-              </span>
-              <TrendingUp size={16} className="text-emerald-500" />
-            </div>
-            <p className="mt-2 font-serif text-xl font-black text-zinc-900 sm:text-2xl dark:text-zinc-100">
-              {formatPrice(totalRevenue, locale)}
-            </p>
-          </div>
-
-          <div className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xs sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="flex items-center justify-between text-zinc-400">
-              <span className="text-[11px] font-bold uppercase tracking-wider">
-                {locale === "ar" ? "إجمالي الطلبات" : "Commandes"}
-              </span>
-              <ShoppingBag size={16} className="text-purple-500" />
-            </div>
-            <p className="mt-2 font-serif text-xl font-black text-zinc-900 sm:text-2xl dark:text-zinc-100">
-              {orders.length}
-            </p>
-          </div>
-
-          <div className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xs sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="flex items-center justify-between text-zinc-400">
-              <span className="text-[11px] font-bold uppercase tracking-wider">
-                {locale === "ar" ? "قيد المعالجة" : "En cours"}
-              </span>
-              <Bell size={16} className="text-amber-500" />
-            </div>
-            <p className="mt-2 font-serif text-xl font-black text-zinc-900 sm:text-2xl dark:text-zinc-100">
-              {pendingOrdersCount}
-            </p>
-          </div>
-
-          <div className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xs sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="flex items-center justify-between text-zinc-400">
-              <span className="text-[11px] font-bold uppercase tracking-wider">
-                {locale === "ar" ? "إجمالي المنتجات" : "Produits"}
-              </span>
-              <Package size={16} className="text-blue-500" />
-            </div>
-            <p className="mt-2 font-serif text-xl font-black text-zinc-900 sm:text-2xl dark:text-zinc-100">
-              {products.length}
-            </p>
-          </div>
-        </div>
-
         {/* View Switcher based on Tab */}
         {activeTab === "orders" && (
           <div className="space-y-4">
@@ -433,53 +370,13 @@ export default function AdminPage() {
         )}
 
         {activeTab === "stats" && (
-          <div className="space-y-6">
-            <h1 className="text-xl font-black text-zinc-900 dark:text-zinc-100">
-              {locale === "ar" ? "الإحصائيات ونشاط المتجر" : "Statistiques de vente"}
-            </h1>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Best Selling Products */}
-              <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-                <h3 className="mb-4 text-sm font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                  {locale === "ar" ? "أكثر المنتجات مشاهدة وطلباً" : "Produits populaires"}
-                </h3>
-                <div className="space-y-3">
-                  {products.slice(0, 5).map((p) => (
-                    <div key={p.id} className="flex items-center justify-between border-b border-zinc-100 pb-2.5 last:border-0 dark:border-zinc-800">
-                      <div>
-                        <p className="text-xs font-bold">{p.name[locale] || p.name.ar}</p>
-                        <p className="text-[10px] text-zinc-400">SKU: {p.sku || "—"}</p>
-                      </div>
-                      <span className="font-serif text-xs font-bold text-emerald-600">
-                        {formatPrice(p.price, locale)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Recent Orders Overview */}
-              <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-                <h3 className="mb-4 text-sm font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                  {locale === "ar" ? "آخر الطلبات المسجلة" : "Dernières commandes"}
-                </h3>
-                <div className="space-y-3">
-                  {orders.slice(0, 5).map((o) => (
-                    <div key={o.id} className="flex items-center justify-between border-b border-zinc-100 pb-2.5 last:border-0 dark:border-zinc-800">
-                      <div>
-                        <p className="text-xs font-bold">{o.customerName}</p>
-                        <p className="text-[10px] text-zinc-400">{o.wilaya} · {o.phone}</p>
-                      </div>
-                      <span className="font-serif text-xs font-bold text-purple-600">
-                        {formatPrice(o.total, locale)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+          <AdminDashboard
+            orders={orders}
+            products={products}
+            abandonedCheckouts={abandonedCheckouts}
+            onOpenOrders={() => setActiveTab("orders")}
+            onOpenAbandoned={() => setActiveTab("abandoned")}
+          />
         )}
 
         {activeTab === "settings" && (
