@@ -183,12 +183,32 @@ const percentColors = [
   { ring: "stroke-purple-500", text: "text-purple-400" },
 ];
 
-const donutSegments = [
-  { color: "#ec4899", label: "Meta" },
-  { color: "#181924", label: "Snapchat" },
-  { color: "#3b82f6", label: "TikTok" },
-  { color: "#a855f7", label: "Google" },
-  { color: "#f59e0b", label: "Autre" },
+const donutPlatforms = [
+  {
+    id: "instagram",
+    color: "#ec4899", // وردي (Pink)
+    label: { ar: "انستغرام", fr: "Instagram" },
+    defaultWeight: 35,
+  },
+  {
+    id: "tiktok",
+    color: "#050505", // أسود (Black)
+    stroke: "#3f3f46",
+    label: { ar: "تيك توك", fr: "TikTok" },
+    defaultWeight: 30,
+  },
+  {
+    id: "facebook",
+    color: "#1877f2", // أزرق (Blue)
+    label: { ar: "فيسبوك", fr: "Facebook" },
+    defaultWeight: 20,
+  },
+  {
+    id: "snapchat",
+    color: "#facc15", // أصفر (Yellow)
+    label: { ar: "سناب شات", fr: "Snapchat" },
+    defaultWeight: 15,
+  },
 ];
 
 function getImageUrl(img: string | { url?: string } | undefined): string {
@@ -635,17 +655,12 @@ export function AdminDashboard({
             <div className="relative flex h-48 w-48 items-center justify-center">
               <svg className="h-48 w-48" viewBox="0 0 100 100">
                 {(() => {
-                  const values = [
-                    pixels.metaPixelIds.filter((id, idx) => id.trim() && pixels.metaPixelEnabled[idx]).length || 3,
-                    2,
-                    pixels.tiktokPixelIds.filter((id, idx) => id.trim() && pixels.tiktokPixelEnabled[idx]).length || 4,
-                    2,
-                    Math.max(1, configuredPixels - activePixels + 1),
-                  ];
+                  const values = donutPlatforms.map((p) => p.defaultWeight);
                   const sum = values.reduce((s, v) => s + v, 0);
                   let startAngle = -Math.PI / 2;
-                  return values.map((v, segIndex) => {
-                    const angle = (v / sum) * Math.PI * 2;
+                  return donutPlatforms.map((platform, segIndex) => {
+                    const weight = platform.defaultWeight;
+                    const angle = (weight / sum) * Math.PI * 2;
                     const endAngle = startAngle + angle;
                     const largeArc = angle > Math.PI ? 1 : 0;
                     const x1 = 50 + 38 * Math.cos(startAngle);
@@ -659,10 +674,10 @@ export function AdminDashboard({
                     startAngle = endAngle;
                     return (
                       <path
-                        key={segIndex}
+                        key={platform.id}
                         d={`M ${x1} ${y1} A 38 38 0 ${largeArc} 1 ${x2} ${y2} L ${ix1} ${iy1} A 24 24 0 ${largeArc} 0 ${ix2} ${iy2} Z`}
-                        fill={donutSegments[segIndex % donutSegments.length].color}
-                        stroke="#181920"
+                        fill={platform.color}
+                        stroke={platform.stroke || "#181920"}
                         strokeWidth="1.5"
                       />
                     );
@@ -671,15 +686,26 @@ export function AdminDashboard({
               </svg>
             </div>
             <div className="mt-3 grid w-full grid-cols-2 gap-2 text-[10px]">
-              {donutSegments.map((seg) => (
-                <div
-                  key={seg.label}
-                  className="flex items-center gap-2 rounded-md border border-zinc-800/80 bg-zinc-900/60 px-2.5 py-1.5"
-                >
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: seg.color }} />
-                  <span className="font-medium text-zinc-300">{seg.label}</span>
-                </div>
-              ))}
+              {donutPlatforms.map((platform) => {
+                const label = platform.label[locale] || platform.label.ar;
+                return (
+                  <div
+                    key={platform.id}
+                    className="flex items-center justify-between gap-2 rounded-md border border-zinc-800/80 bg-zinc-900/60 px-2.5 py-1.5"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full border border-white/20"
+                        style={{ background: platform.color }}
+                      />
+                      <span className="font-medium text-zinc-200 truncate">{label}</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-zinc-400">
+                      {platform.defaultWeight}%
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>
