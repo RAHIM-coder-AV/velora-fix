@@ -132,10 +132,21 @@ export function buildDashboardAnalytics(
     return Math.round(((today - yesterdayValue) / yesterdayValue) * 100);
   };
 
+  const totalViews = products.reduce((sum, p) => sum + (p.views ?? 0), 0);
   const topViewedProducts = [...products]
     .filter((product) => product.active !== false)
     .sort((left, right) => (right.views ?? 0) - (left.views ?? 0))
-    .slice(0, 5);
+    .slice(0, 5)
+    .map((product) => {
+      const views = product.views ?? 0;
+      return {
+        id: product.id,
+        name: product.name,
+        image: typeof product.images[0] === "string" ? product.images[0] : product.images[0]?.url || "",
+        views,
+        percent: totalViews > 0 ? Math.round((views / totalViews) * 1000) / 10 : 0,
+      };
+    });
 
   return {
     ordersToday,
@@ -151,6 +162,7 @@ export function buildDashboardAnalytics(
     cancelledChange: changeRate(cancelledToday, cancelledYesterday),
     abandonedChange: changeRate(abandonedToday, abandonedYesterday),
     totalRevenue: [...productStats.values()].reduce((sum, s) => sum + s.revenue, 0),
+    totalViews,
     days,
     bestProducts: bestProductsWithPercent,
     bestProductsDetailed,

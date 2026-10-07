@@ -369,6 +369,8 @@ interface CatalogState {
   orders: Order[];
   abandonedCheckouts: AbandonedCheckout[];
   reviews: Review[];
+  localDataReady: boolean;
+  hydrateLocalData: () => void;
   refresh: () => Promise<void>;
   refreshOrders: (all?: boolean) => Promise<void>;
   refreshAbandonedCheckouts: () => Promise<void>;
@@ -411,12 +413,27 @@ export interface ImportLocalProductsResult {
 const sb = () => (isSupabaseConfigured() ? createClient() : null);
 
 export const useCatalogStore = create<CatalogState>()((set, get) => ({
-  products: getStoredProducts(),
+  // Server and client must render identical markup on the first pass, so no
+  // browser storage is read during store creation. Local data is loaded in
+  // hydrateLocalData(), which runs from an effect after hydration.
+  products: [],
   categories: seedCategories,
   catalogLoadState: isSupabaseConfigured() ? "loading" : "ready",
-  orders: getStoredOrders(),
-  abandonedCheckouts: getStoredAbandonedCheckouts(),
+  orders: [],
+  abandonedCheckouts: [],
   reviews: seedReviews,
+  localDataReady: false,
+  hydrateLocalData: () => {
+    if (typeof window === "undefined") return;
+    set((state) => ({
+      products: state.products.length ? state.products : getStoredProducts(),
+      orders: state.orders.length ? state.orders : getStoredOrders(),
+      abandonedCheckouts: state.abandonedCheckouts.length
+        ? state.abandonedCheckouts
+        : getStoredAbandonedCheckouts(),
+      localDataReady: true,
+    }));
+  },
   refresh: async () => {
     const client = sb();
     if (!client) {

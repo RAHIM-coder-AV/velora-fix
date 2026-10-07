@@ -71,6 +71,23 @@ function ProductCards({
   );
 }
 
+function ProductSectionPlaceholder() {
+  return (
+    <div
+      className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4"
+      aria-hidden="true"
+    >
+      {[0, 1, 2, 3].map((index) => (
+        <div key={index} className="animate-pulse">
+          <div className="aspect-[4/5] bg-stone-200" />
+          <div className="mt-3 h-4 w-3/4 bg-stone-200" />
+          <div className="mt-2 h-4 w-1/2 bg-stone-200" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SectionView({
   section,
   content,
@@ -84,6 +101,8 @@ function SectionView({
   products: Product[];
   categories: Category[];
 }) {
+  const localDataReady = useCatalogStore((state) => state.localDataReady);
+  const catalogLoadState = useCatalogStore((state) => state.catalogLoadState);
   const title = "title" in section ? text(section.title, locale) : "";
   const sectionSurface = {
     atelier: "bg-white",
@@ -171,7 +190,9 @@ function SectionView({
             {locale === "ar" ? "عرض الكل" : "Tout voir"}
           </Link>
         </div>
-        {selectedProducts.length ? (
+        {!localDataReady || (selectedProducts.length === 0 && catalogLoadState === "loading") ? (
+          <ProductSectionPlaceholder />
+        ) : selectedProducts.length ? (
           <ProductCards products={selectedProducts} locale={locale} />
         ) : (
           <p className="border border-stone-200 p-6 text-sm text-stone-600">
