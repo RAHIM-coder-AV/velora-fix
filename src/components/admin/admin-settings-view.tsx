@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Truck,
   Search,
@@ -13,15 +14,20 @@ import {
   ClipboardList,
   House,
   Check,
+  Languages,
+  Globe,
+  Palette,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useSettingsStore } from "@/stores/settings-store";
 import { PixelSettingsEditor } from "@/components/admin/pixel-settings-editor";
 import { AdminCategoriesSettings } from "@/components/admin/admin-categories-settings";
-import type { Category } from "@/types";
+import { AdminHomepageEditor } from "@/components/admin/admin-homepage-editor";
+import type { Category, Product } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
 import { toast } from "@/components/ui/toast";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
+import { locales, type Locale } from "@/i18n/config";
 
 type SettingsSection =
   | "overview"
@@ -31,24 +37,32 @@ type SettingsSection =
   | "nord_ouest"
   | "pixels"
   | "form"
+  | "homepage"
+  | "languages"
   | "categories"
   | "identity"
   | "thankyou";
 
 interface AdminSettingsViewProps {
+  products: Product[];
   categories: Category[];
   onSaveCategory: (category: Category) => Promise<void>;
   onDeleteCategory: (id: string) => Promise<void>;
-  onOpenHomepage: () => void;
+  initialSection?: SettingsSection;
+  onOpenHomepage?: () => void;
 }
 
 export function AdminSettingsView({
+  products,
   categories,
   onSaveCategory,
   onDeleteCategory,
+  initialSection = "overview",
   onOpenHomepage,
 }: AdminSettingsViewProps) {
   const { locale } = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
   const updateWilayaPrice = useSettingsStore((s) => s.updateWilayaPrice);
@@ -59,7 +73,7 @@ export function AdminSettingsView({
   const saveSharedSettings = useSettingsStore((s) => s.saveSharedSettings);
   const [savingShared, setSavingShared] = useState(false);
 
-  const [activeSubTab, setActiveSubTab] = useState<SettingsSection>("overview");
+  const [activeSubTab, setActiveSubTab] = useState<SettingsSection>(initialSection);
   const [searchQuery, setSearchQuery] = useState("");
   const [bulkHome, setBulkHome] = useState("");
   const [bulkDesk, setBulkDesk] = useState("");
@@ -260,20 +274,21 @@ export function AdminSettingsView({
         {activeSubTab === "overview" && (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {([
-              { title: locale === "ar" ? "أسعار الشحن والتوصيل" : "Tarifs de livraison", description: locale === "ar" ? "تعديل أسعار المنزل والمكتب حسب الولاية." : "Tarifs domicile et point relais par wilaya.", icon: Truck, tab: "delivery" as const },
+              { title: locale === "ar" ? "أسعار الشحن والتوصيل" : "Tarifs de livraison", description: locale === "ar" ? "تعديل أسعار المنزل والمكتب حسب 58 ولاية." : "Tarifs domicile et point relais par wilaya.", icon: Truck, tab: "delivery" as const },
               { title: locale === "ar" ? "الربط مع الخدمات" : "Intégrations", description: locale === "ar" ? "إعداد Meta Pixel وTikTok وخدمات الشحن." : "Meta Pixel, TikTok et transporteurs.", icon: Share2, tab: "integrations" as const },
-              { title: locale === "ar" ? "إعدادات النموذج" : "Formulaires", description: locale === "ar" ? "التحكم في حقول الطلب في السلة وصفحة المنتج." : "Champs de commande du panier et du produit.", icon: ClipboardList, tab: "form" as const },
-              { title: locale === "ar" ? "الصفحة الرئيسية وصفحة المنتج" : "Accueil et page produit", description: locale === "ar" ? "تحرير محتوى الصفحة الرئيسية ومظهر صفحات المنتجات." : "Modifier l’accueil et les pages produit.", icon: House, action: "homepage" as const },
-              { title: locale === "ar" ? "إعدادات المتجر" : "Identité du magasin", description: locale === "ar" ? "اسم المتجر وشعاره النصي ورابط الشعار." : "Nom, slogan et logo de la boutique.", icon: Store, tab: "identity" as const },
+              { title: locale === "ar" ? "تصميم وقالب المتجر" : "Design & Modèle de la boutique", description: locale === "ar" ? "تحرير محتوى الصفحة الرئيسية وقالب العرض والأقسام." : "Personnaliser l’accueil et le modèle de la boutique.", icon: Palette, tab: "homepage" as const },
+              { title: locale === "ar" ? "لغات المتجر (العربية والفرنسية)" : "Langues (Arabe & Français)", description: locale === "ar" ? "إدارة لغة المتجر والتبديل بين العربية والفرنسية." : "Gérer les langues disponibles et la langue par défaut.", icon: Languages, tab: "languages" as const },
+              { title: locale === "ar" ? "هوية المتجر" : "Identité du magasin", description: locale === "ar" ? "اسم المتجر وشعاره النصي ورابط الشعار." : "Nom, slogan et logo de la boutique.", icon: Store, tab: "identity" as const },
               { title: locale === "ar" ? "إدارة الفئات" : "Catégories", description: locale === "ar" ? "إضافة الفئات وتعديل أسمائها ووصفها وصورها." : "Créer et modifier les catégories.", icon: Tags, tab: "categories" as const },
+              { title: locale === "ar" ? "إعدادات النموذج" : "Formulaires", description: locale === "ar" ? "التحكم في حقول الطلب في السلة وصفحة المنتج." : "Champs de commande du panier et du produit.", icon: ClipboardList, tab: "form" as const },
               { title: locale === "ar" ? "صفحة الشكر" : "Page de remerciement", description: locale === "ar" ? "تعديل العنوان والنص الظاهر بعد إتمام الطلب." : "Personnaliser le message après la commande.", icon: Check, tab: "thankyou" as const },
-            ] satisfies Array<{ title: string; description: string; icon: LucideIcon; tab?: SettingsSection; action?: "homepage" }>).map((card) => {
+            ] satisfies Array<{ title: string; description: string; icon: LucideIcon; tab: SettingsSection }>).map((card) => {
               const Icon = card.icon;
               return (
                 <button
                   key={card.title}
                   type="button"
-                  onClick={() => card.action === "homepage" ? onOpenHomepage() : card.tab && setActiveSubTab(card.tab)}
+                  onClick={() => setActiveSubTab(card.tab)}
                   className="flex min-h-24 items-center gap-4 rounded-xl border border-zinc-200 bg-white p-4 text-start transition hover:border-purple-400 hover:bg-purple-50/50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-purple-700 dark:hover:bg-purple-950/20"
                 >
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300"><Icon size={20} /></span>
@@ -288,24 +303,50 @@ export function AdminSettingsView({
         )}
 
         {activeSubTab !== "overview" && (
-        <div className="grid w-full grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 sm:inline-flex sm:w-auto sm:grid-cols-none dark:bg-zinc-800">
+        <div className="flex flex-wrap gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800 text-xs">
           <button
             type="button"
             onClick={() => setActiveSubTab("delivery")}
-            className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-center text-[11px] font-bold transition sm:px-3.5 sm:py-1.5 sm:text-xs ${
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition ${
               activeSubTab === "delivery"
                 ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
                 : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
             <Truck size={14} className="text-purple-600" />
-            <span>{locale === "ar" ? "أسعار التوصيل (58 ولاية)" : "Tarifs Livraison"}</span>
+            <span>{locale === "ar" ? "أسعار التوصيل" : "Livraison"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("homepage")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition ${
+              activeSubTab === "homepage"
+                ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
+                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+            }`}
+          >
+            <Palette size={14} className="text-purple-400" />
+            <span>{locale === "ar" ? "تصميم وقالب المتجر" : "Design du magasin"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("languages")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition ${
+              activeSubTab === "languages"
+                ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
+                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+            }`}
+          >
+            <Languages size={14} className="text-blue-400" />
+            <span>{locale === "ar" ? "لغات المتجر" : "Langues"}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSubTab("integrations")}
-            className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-center text-[11px] font-bold transition sm:px-3.5 sm:py-1.5 sm:text-xs ${
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition ${
               activeSubTab === "integrations" || activeSubTab === "ecotrack" || activeSubTab === "nord_ouest" || activeSubTab === "pixels"
                 ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
                 : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
@@ -317,28 +358,54 @@ export function AdminSettingsView({
 
           <button
             type="button"
-            onClick={() => setActiveSubTab("nord_ouest")}
-            className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-center text-[11px] font-bold transition sm:px-3.5 sm:py-1.5 sm:text-xs ${
-              activeSubTab === "nord_ouest"
+            onClick={() => setActiveSubTab("identity")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition ${
+              activeSubTab === "identity"
                 ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
                 : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
-            <Truck size={14} className="text-blue-600" />
-            <span>{locale === "ar" ? "شركة Nord Et Ouest" : "Nord Et Ouest"}</span>
+            <Store size={14} className="text-amber-500" />
+            <span>{locale === "ar" ? "هوية المتجر" : "Identité"}</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveSubTab("pixels")}
-            className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-center text-[11px] font-bold transition sm:px-3.5 sm:py-1.5 sm:text-xs ${
-              activeSubTab === "pixels"
+            onClick={() => setActiveSubTab("categories")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition ${
+              activeSubTab === "categories"
                 ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
                 : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
-            <Radio size={14} className="text-purple-600" />
-            <span>{locale === "ar" ? "البيكسل الإعلاني" : "Pixels"}</span>
+            <Tags size={14} className="text-pink-500" />
+            <span>{locale === "ar" ? "الفئات" : "Catégories"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("form")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition ${
+              activeSubTab === "form"
+                ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
+                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+            }`}
+          >
+            <ClipboardList size={14} className="text-indigo-500" />
+            <span>{locale === "ar" ? "النماذج" : "Formulaires"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("thankyou")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition ${
+              activeSubTab === "thankyou"
+                ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
+                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+            }`}
+          >
+            <Check size={14} className="text-emerald-500" />
+            <span>{locale === "ar" ? "صفحة الشكر" : "Page de remerciement"}</span>
           </button>
         </div>
         )}
@@ -556,6 +623,131 @@ export function AdminSettingsView({
           </section>
           <button type="button" disabled={savingShared} onClick={() => void saveShared()} className="flex items-center gap-2 rounded-lg bg-purple-700 px-5 py-3 text-xs font-bold text-white disabled:opacity-50"><Save size={14} />{locale === "ar" ? "حفظ إعدادات النماذج" : "Enregistrer les formulaires"}</button>
         </div>
+      )}
+
+      {activeSubTab === "homepage" && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-zinc-800 bg-[#18181b] p-4">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Palette size={18} className="text-purple-400" />
+              <span>{locale === "ar" ? "تصميم وقالب المتجر" : "Design & Modèle du magasin"}</span>
+            </h2>
+            <p className="mt-1 text-xs text-zinc-400">
+              {locale === "ar"
+                ? "تخصيص قالب العرض، ترتيب أقسام الصفحة الرئيسية، تعديل النصوص والصور والأقسام الترويجية."
+                : "Personnalisez le modèle de présentation, l'ordre des sections et les contenus."}
+            </p>
+          </div>
+          <AdminHomepageEditor products={products} categories={categories} />
+        </div>
+      )}
+
+      {activeSubTab === "languages" && (
+        <section className="max-w-3xl space-y-5" dir={locale === "ar" ? "rtl" : "ltr"}>
+          <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex items-center gap-3 border-b border-zinc-200 pb-4 dark:border-zinc-800">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 text-blue-400">
+                <Globe size={22} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  {locale === "ar" ? "إعدادات لغات المتجر" : "Paramètres des langues"}
+                </h2>
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  {locale === "ar"
+                    ? "المتجر مهيأ بالكامل لدعم اللغتين العربية والفرنسية فقط لتوفير تجربة سريعة وسلسة لعملائك."
+                    : "La boutique supporte uniquement l'Arabe et le Français pour une expérience optimale."}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                {locale === "ar" ? "اللغات المفعلة في المتجر" : "Langues actives"}
+              </h3>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {/* Arabic */}
+                <div className="flex items-center justify-between rounded-xl border border-purple-500/30 bg-purple-500/10 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-600 font-bold text-white text-sm">
+                      ع
+                    </span>
+                    <div>
+                      <p className="font-bold text-sm text-zinc-900 dark:text-zinc-100">العربية (Arabe)</p>
+                      <p className="text-[11px] text-zinc-500">من اليمين إلى اليسار (RTL)</p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-[10px] font-bold text-emerald-400">
+                    {locale === "ar" ? "مفعلة" : "Active"}
+                  </span>
+                </div>
+
+                {/* French */}
+                <div className="flex items-center justify-between rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 font-bold text-white text-sm">
+                      FR
+                    </span>
+                    <div>
+                      <p className="font-bold text-sm text-zinc-900 dark:text-zinc-100">Français (الفرنسية)</p>
+                      <p className="text-[11px] text-zinc-500">De gauche à droite (LTR)</p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-[10px] font-bold text-emerald-400">
+                    {locale === "ar" ? "مفعلة" : "Active"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Language Switcher for Admin */}
+              <div className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/40">
+                <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200 mb-2">
+                  {locale === "ar" ? "التبديل الفوري للغة لوحة التحكم" : "Changer la langue d'administration"}
+                </h4>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (locale !== "ar") {
+                        const parts = pathname.split("/");
+                        parts[1] = "ar";
+                        router.push(parts.join("/") || "/ar/admin");
+                      }
+                    }}
+                    className={`flex-1 rounded-lg py-2.5 px-3 text-xs font-bold transition flex items-center justify-center gap-2 ${
+                      locale === "ar"
+                        ? "bg-purple-600 text-white shadow-sm"
+                        : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 hover:border-purple-400"
+                    }`}
+                  >
+                    <span>🇩🇿 العربية (Arabic)</span>
+                    {locale === "ar" && <Check size={14} />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (locale !== "fr") {
+                        const parts = pathname.split("/");
+                        parts[1] = "fr";
+                        router.push(parts.join("/") || "/fr/admin");
+                      }
+                    }}
+                    className={`flex-1 rounded-lg py-2.5 px-3 text-xs font-bold transition flex items-center justify-center gap-2 ${
+                      locale === "fr"
+                        ? "bg-purple-600 text-white shadow-sm"
+                        : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 hover:border-purple-400"
+                    }`}
+                  >
+                    <span>🇫🇷 Français (French)</span>
+                    {locale === "fr" && <Check size={14} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       )}
 
       {activeSubTab === "identity" && (

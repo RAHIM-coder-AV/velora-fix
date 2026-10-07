@@ -355,7 +355,6 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <AdminHomepageEditor products={products} categories={categories} />
             <AdminProductsTable
               products={products}
               categories={categories}
@@ -381,13 +380,10 @@ export default function AdminPage() {
 
         {activeTab === "settings" && (
           <AdminSettingsView
+            products={products}
             categories={categories}
             onSaveCategory={upsertCategory}
             onDeleteCategory={deleteCategory}
-            onOpenHomepage={() => {
-              setActiveTab("products");
-              window.setTimeout(() => document.getElementById("homepage-editor")?.scrollIntoView({ behavior: "smooth" }), 100);
-            }}
           />
         )}
       </main>
