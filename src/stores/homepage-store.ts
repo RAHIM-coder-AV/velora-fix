@@ -31,6 +31,10 @@ function readLocalContent(): HomepageContent | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
+    if (raw.includes("velora-fashion-watermark.svg")) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
     const parsed: unknown = JSON.parse(raw);
     return isHomepageContent(parsed) ? parsed : null;
   } catch {
