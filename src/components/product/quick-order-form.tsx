@@ -270,7 +270,6 @@ export function QuickOrderForm({
         onClickCapture={abandonedCheckout.startTracking}
         className="space-y-5"
       >
-        <p className="text-xs leading-5 text-zinc-600 dark:text-zinc-300">{storefront.productForm.intro[locale]}</p>
         {/* Customer Information Section */}
         <div className="space-y-3">
           <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
