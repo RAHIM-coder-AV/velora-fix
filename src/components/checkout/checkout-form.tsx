@@ -19,6 +19,7 @@ import type { Order } from "@/types";
 import { LocaleLink } from "@/components/layout/language-switcher";
 import { useAbandonedCheckout } from "@/lib/orders/use-abandoned-checkout";
 import { trackPurchaseEvent } from "@/components/analytics/analytics-scripts";
+import { getAttributedTrafficSource } from "@/lib/analytics/traffic-source";
 
 export function CheckoutForm() {
   const { locale, dict } = useLocale();
@@ -125,6 +126,7 @@ export function CheckoutForm() {
       return null;
     });
 
+    const attribution = getAttributedTrafficSource();
     const order: Order = {
       id: uid("ord"),
       reference: orderReference(),
@@ -141,6 +143,8 @@ export function CheckoutForm() {
       subtotal: totals.subtotal,
       shipping: totals.shipping,
       total: totals.total,
+      trafficSource: attribution.source,
+      utmCampaign: attribution.campaign,
       createdAt: new Date().toISOString(),
       items: lines.map((l) => ({
         id: uid("oi"),

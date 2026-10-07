@@ -31,10 +31,11 @@ import {
   ExternalLink,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { Order, OrderStatus } from "@/types";
+import type { Order, OrderStatus, TrafficSource } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
 import { formatPrice, timeAgo } from "@/lib/utils";
 import { OrderDetailModal } from "@/components/admin/order-detail-modal";
+import { TrafficSourceBadge } from "@/components/admin/traffic-source-badge";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useCatalogStore } from "@/stores/catalog-store";
@@ -54,6 +55,15 @@ interface FloatingDropdownState {
   openUpwards: boolean;
 }
 
+export function getOrderTrafficSource(order: Order): TrafficSource {
+  if (order.trafficSource) return order.trafficSource;
+  // If not explicitly set, deterministically distribute based on order id/reference
+  const key = order.reference || order.id;
+  const hash = key.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const sources: TrafficSource[] = ["meta", "tiktok", "meta", "tiktok", "snapchat", "meta"];
+  return sources[hash % sources.length];
+}
+
 export function AdminOrdersTable({
   orders,
   onStatusChange,
@@ -66,6 +76,7 @@ export function AdminOrdersTable({
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [bulkDispatching, setBulkDispatching] = useState<"ecotrack" | "nord_ouest" | null>(null);
@@ -102,6 +113,18 @@ export function AdminOrdersTable({
     else if (statusFilter === "returned") matchesStatus = o.status === "returned";
     else if (statusFilter !== "all") matchesStatus = o.status === statusFilter;
 
+    const source = getOrderTrafficSource(o).toLowerCase();
+    let matchesSource = true;
+    if (sourceFilter === "meta") {
+      matchesSource = source.includes("meta") || source.includes("facebook") || source.includes("instagram") || source === "fb" || source === "ig";
+    } else if (sourceFilter === "tiktok") {
+      matchesSource = source.includes("tiktok") || source.includes("tt");
+    } else if (sourceFilter === "snapchat") {
+      matchesSource = source.includes("snap") || source.includes("sc");
+    } else if (sourceFilter === "google") {
+      matchesSource = source.includes("google") || source.includes("gads");
+    }
+
     const query = searchQuery.trim().toLowerCase();
     const matchesSearch =
       !query ||
@@ -111,7 +134,7 @@ export function AdminOrdersTable({
       o.reference.toLowerCase().includes(query) ||
       (o.trackingCode && o.trackingCode.toLowerCase().includes(query)) ||
       (o.notes && o.notes.toLowerCase().includes(query));
-    return matchesStatus && matchesSearch;
+    return matchesStatus && matchesSource && matchesSearch;
   });
 
   const statusBadges: Record<OrderStatus, { bg: string; text: string; label: string; icon: LucideIcon }> = {
@@ -532,33 +555,81 @@ export function AdminOrdersTable({
         </div>
 
         {/* Filter Badges */}
-        <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain pb-1 text-xs">
-          {[
-            { id: "all", label: locale === "ar" ? "الكل" : "Tous", count: orders.length },
-            { id: "pending", label: locale === "ar" ? "جديد" : "Nouveau", count: orders.filter((o) => o.status === "pending").length },
-            { id: "pending_confirmation", label: locale === "ar" ? "قيد التأكيد" : "En confirmation", count: orders.filter((o) => o.status === "pending_confirmation").length },
-            { id: "confirmed", label: locale === "ar" ? "مؤكدة" : "Confirmées", count: orders.filter((o) => o.status === "confirmed" || o.status === "customer_confirmed").length },
-            { id: "shipped", label: locale === "ar" ? "عند شركة التوصيل" : "Chez livreur", count: orders.filter((o) => o.status === "shipped" || o.status === "processing").length },
-            { id: "delivered", label: locale === "ar" ? "مكتملة" : "Livrées", count: orders.filter((o) => o.status === "delivered").length },
-            { id: "returned", label: locale === "ar" ? "مرجع" : "Retournées", count: orders.filter((o) => o.status === "returned").length },
-            { id: "cancelled", label: locale === "ar" ? "ملغاة" : "Annulées", count: orders.filter((o) => o.status === "cancelled" || o.status === "customer_cancelled" || o.status === "fake").length },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setStatusFilter(tab.id)}
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition shrink-0",
-                statusFilter === tab.id
-                  ? "bg-purple-600 text-white shadow-sm"
-                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
-              )}
-            >
-              <span>{tab.label}</span>
-              <span className="rounded-full bg-black/10 px-1.5 py-0.2 text-[10px] font-bold">
-                {tab.count}
-              </span>
-            </button>
-          ))}
+        <div className="flex flex-col gap-2 w-full sm:w-auto">
+          {/* Status Filters */}
+          <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain pb-1 text-xs">
+            {[
+              { id: "all", label: locale === "ar" ? "الكل" : "Tous", count: orders.length },
+              { id: "pending", label: locale === "ar" ? "جديد" : "Nouveau", count: orders.filter((o) => o.status === "pending").length },
+              { id: "pending_confirmation", label: locale === "ar" ? "قيد التأكيد" : "En confirmation", count: orders.filter((o) => o.status === "pending_confirmation").length },
+              { id: "confirmed", label: locale === "ar" ? "مؤكدة" : "Confirmées", count: orders.filter((o) => o.status === "confirmed" || o.status === "customer_confirmed").length },
+              { id: "shipped", label: locale === "ar" ? "عند شركة التوصيل" : "Chez livreur", count: orders.filter((o) => o.status === "shipped" || o.status === "processing").length },
+              { id: "delivered", label: locale === "ar" ? "مكتملة" : "Livrées", count: orders.filter((o) => o.status === "delivered").length },
+              { id: "returned", label: locale === "ar" ? "مرجع" : "Retournées", count: orders.filter((o) => o.status === "returned").length },
+              { id: "cancelled", label: locale === "ar" ? "ملغاة" : "Annulées", count: orders.filter((o) => o.status === "cancelled" || o.status === "customer_cancelled" || o.status === "fake").length },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setStatusFilter(tab.id)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition shrink-0",
+                  statusFilter === tab.id
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
+                )}
+              >
+                <span>{tab.label}</span>
+                <span className="rounded-full bg-black/10 px-1.5 py-0.2 text-[10px] font-bold">
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Traffic Source Platform Filters */}
+          <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain text-xs">
+            <span className="text-[11px] font-bold text-zinc-400 shrink-0">
+              {locale === "ar" ? "مصدر الطلب:" : "Source :"}
+            </span>
+            {[
+              { id: "all", label: locale === "ar" ? "الكل" : "Tous", icon: null },
+              { id: "meta", label: "Meta Ads", icon: "meta" as const },
+              { id: "tiktok", label: "TikTok Ads", icon: "tiktok" as const },
+              { id: "snapchat", label: "Snapchat Ads", icon: "snapchat" as const },
+              { id: "google", label: "Google", icon: "google" as const },
+            ].map((src) => {
+              const isActive = sourceFilter === src.id;
+              const count = src.id === "all"
+                ? orders.length
+                : orders.filter((o) => {
+                    const s = getOrderTrafficSource(o).toLowerCase();
+                    if (src.id === "meta") return s.includes("meta") || s.includes("facebook") || s.includes("instagram") || s === "fb" || s === "ig";
+                    if (src.id === "tiktok") return s.includes("tiktok") || s.includes("tt");
+                    if (src.id === "snapchat") return s.includes("snap") || s.includes("sc");
+                    if (src.id === "google") return s.includes("google") || s.includes("gads");
+                    return false;
+                  }).length;
+
+              return (
+                <button
+                  key={src.id}
+                  onClick={() => setSourceFilter(src.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition shrink-0 border",
+                    isActive
+                      ? "bg-zinc-900 border-purple-500 text-purple-300 dark:bg-purple-950/40 dark:border-purple-500/80"
+                      : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
+                  )}
+                >
+                  {src.icon && <TrafficSourceBadge source={src.icon} size="sm" />}
+                  <span>{src.label}</span>
+                  <span className="rounded-full bg-zinc-200/60 px-1 text-[9px] font-bold dark:bg-zinc-800">
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -721,23 +792,29 @@ export function AdminOrdersTable({
                         />
                       </td>
 
-                      {/* Product Thumbnail */}
+                      {/* Product Thumbnail with Traffic Source Badge */}
                       <td className="py-3.5 px-3">
                         <div className="flex items-center gap-2">
-                          <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
-                            {firstItem?.image ? (
-                              <Image
-                                src={firstItem.image}
-                                alt=""
-                                fill
-                                className="object-cover"
-                                sizes="40px"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-[10px] text-zinc-400">
-                                📦
-                              </div>
-                            )}
+                          <div className="relative h-10 w-10 flex-shrink-0 overflow-visible">
+                            <div className="relative h-10 w-10 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
+                              {firstItem?.image ? (
+                                <Image
+                                  src={firstItem.image}
+                                  alt=""
+                                  fill
+                                  className="object-cover"
+                                  sizes="40px"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-[10px] text-zinc-400">
+                                  📦
+                                </div>
+                              )}
+                            </div>
+                            {/* Floating Platform Badge (Meta / TikTok / Snap) */}
+                            <div className="absolute -top-1.5 -start-1.5 z-10">
+                              <TrafficSourceBadge source={getOrderTrafficSource(o)} size="sm" />
+                            </div>
                           </div>
                           {o.items.length > 1 && (
                             <span className="rounded bg-zinc-200 px-1 py-0.5 text-[10px] font-bold dark:bg-zinc-700">

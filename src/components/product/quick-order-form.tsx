@@ -16,6 +16,7 @@ import { placeOrder as placeOrderDb } from "@/lib/supabase/data";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
 import { trackPurchaseEvent } from "@/components/analytics/analytics-scripts";
+import { captureTrafficSource, getAttributedTrafficSource } from "@/lib/analytics/traffic-source";
 
 interface QuickOrderFormProps {
   product: Product;
@@ -36,6 +37,10 @@ export function QuickOrderForm({
   const router = useRouter();
   const addOrder = useCatalogStore((s) => s.addOrder);
   const setVariantStock = useCatalogStore((s) => s.setVariantStock);
+
+  useEffect(() => {
+    captureTrafficSource();
+  }, []);
 
   // Offers configuration: use product.offers or fallback to standard packs
   const offers: ProductOffer[] = useMemo(() => {
@@ -186,6 +191,7 @@ export function QuickOrderForm({
       }
 
       const ref = orderReference();
+      const attribution = getAttributedTrafficSource();
 
       const newOrder: Order = {
         id: uid("ord"),
@@ -201,6 +207,8 @@ export function QuickOrderForm({
         shipping: shippingFee,
         total: currentPrice + shippingFee,
         offerTitle: selectedOffer ? (selectedOffer.title[locale] || selectedOffer.title.ar) : undefined,
+        trafficSource: attribution.source,
+        utmCampaign: attribution.campaign,
         createdAt: new Date().toISOString(),
         items: [
           {

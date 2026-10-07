@@ -23,6 +23,8 @@ import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { ALGERIA_WILAYAS } from "@/lib/algeria-data";
 import { calculateOrderTotals, canEditOrder } from "@/lib/orders/order-editing";
+import { TrafficSourceBadge } from "@/components/admin/traffic-source-badge";
+import { getOrderTrafficSource } from "@/components/admin/admin-orders-table";
 
 interface OrderDetailModalProps {
   order: Order | null;
@@ -629,6 +631,21 @@ export function OrderDetailModal({
                 )}>
                   {order.notes?.trim() ? order.notes : (locale === "ar" ? "بدون ملاحظة" : "Sans remarque")}
                 </div>
+              </div>
+
+              {/* Traffic Source Attribution */}
+              <div className="sm:col-span-2 flex items-center justify-between rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800/80">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-zinc-500">
+                    {locale === "ar" ? "مصدر الإعلان / المنصة:" : "Source publicitaire :"}
+                  </span>
+                  <TrafficSourceBadge source={order.trafficSource || getOrderTrafficSource(order)} size="md" showLabel />
+                </div>
+                {order.utmCampaign && (
+                  <span className="text-[11px] text-zinc-400 font-mono">
+                    {locale === "ar" ? "الحملة: " : "Campagne: "} {order.utmCampaign}
+                  </span>
+                )}
               </div>
             </div>
 

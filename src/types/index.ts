@@ -123,6 +123,8 @@ export interface OrderItem {
   sku?: string;
 }
 
+export type TrafficSource = "meta" | "tiktok" | "snapchat" | "google" | "direct" | string;
+
 export interface Order {
   id: string;
   reference: string;
@@ -147,6 +149,9 @@ export interface Order {
   deliveryCompany?: "ecotrack" | "nord_ouest" | string;
   deliveryDispatchedAt?: string;
   labelUrl?: string;
+  trafficSource?: TrafficSource;
+  utmSource?: string;
+  utmCampaign?: string;
   createdAt: string;
 }
 
