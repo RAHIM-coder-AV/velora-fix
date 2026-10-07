@@ -23,6 +23,7 @@ import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { AdminAbandonedCheckouts } from "@/components/admin/admin-abandoned-checkouts";
 import { isUndeliveredOrder } from "@/lib/orders/abandoned";
 import { AdminProductsTable } from "@/components/admin/admin-products-table";
+import { AdminInventoryView } from "@/components/admin/admin-inventory-view";
 import { AdminHomepageEditor } from "@/components/admin/admin-homepage-editor";
 import { AdminStoreDesign } from "@/components/admin/admin-store-design";
 import { AdminSettingsView } from "@/components/admin/admin-settings-view";
@@ -32,7 +33,7 @@ import { getLocalProductsToImport } from "@/lib/catalog/catalog-sync";
 import { products as seedProducts } from "@/lib/catalog/seed";
 import { errorMessage } from "@/lib/errors";
 
-type AdminTab = "stats" | "orders" | "abandoned" | "products" | "design" | "settings";
+type AdminTab = "stats" | "orders" | "abandoned" | "products" | "inventory" | "design" | "settings";
 
 export default function AdminPage() {
   const { locale } = useLocale();
@@ -58,6 +59,7 @@ export default function AdminPage() {
   const deleteOrder = useCatalogStore((s) => s.deleteOrder);
   const refreshOrders = useCatalogStore((s) => s.refreshOrders);
   const refreshAbandonedCheckouts = useCatalogStore((s) => s.refreshAbandonedCheckouts);
+  const setVariantStock = useCatalogStore((s) => s.setVariantStock);
 
   const [activeTab, setActiveTab] = useState<AdminTab>("stats");
   const [adminLoginError, setAdminLoginError] = useState("");
@@ -188,7 +190,8 @@ export default function AdminPage() {
             { tab: "stats", label: locale === "ar" ? "الرئيسية" : "Accueil", icon: LayoutDashboard },
             { tab: "orders", label: locale === "ar" ? "الطلبات" : "Commandes", icon: ShoppingBag, count: orders.length },
             { tab: "abandoned", label: locale === "ar" ? "الطلبات المتروكة" : "Commandes abandonnées", icon: AlertTriangle, count: abandonedCheckouts.length + orders.filter((order) => isUndeliveredOrder(order.status)).length },
-            { tab: "products", label: locale === "ar" ? "المنتجات والمخزون" : "Produits & Stock", icon: Package, count: products.length },
+            { tab: "products", label: locale === "ar" ? "المنتجات" : "Produits", icon: Package, count: products.length },
+            { tab: "inventory", label: locale === "ar" ? "إدارة المخزون" : "Gestion du stock", icon: Warehouse, count: products.reduce((acc, p) => acc + (p.variants.some((v) => v.stock <= 5) ? 1 : 0), 0) || undefined },
             { tab: "design", label: locale === "ar" ? "تصميم المتجر" : "Design du magasin", icon: Palette },
             { tab: "settings", label: locale === "ar" ? "الإعدادات" : "Paramètres", icon: Settings },
           ] as const).map((item) => {
@@ -208,7 +211,7 @@ export default function AdminPage() {
               >
                 <Icon size={17} className={isActive ? "text-purple-200" : "text-zinc-400"} />
                 <span className="flex-1">{item.label}</span>
-                {"count" in item && (
+                {"count" in item && item.count !== undefined && (
                   <span className="rounded-full bg-purple-400/25 px-2 py-0.5 text-[10px] text-purple-200">{item.count}</span>
                 )}
                 {isActive && <ChevronLeft size={14} className="text-purple-200" />}
@@ -254,6 +257,7 @@ export default function AdminPage() {
               { tab: "orders", label: locale === "ar" ? "الطلبات" : "Commandes", icon: ShoppingBag },
               { tab: "abandoned", label: locale === "ar" ? "المتروكة" : "Abandonnées", icon: AlertTriangle },
               { tab: "products", label: locale === "ar" ? "المنتجات" : "Produits", icon: Package },
+              { tab: "inventory", label: locale === "ar" ? "المخزون" : "Stock", icon: Warehouse },
               { tab: "design", label: locale === "ar" ? "التصميم" : "Design", icon: Palette },
               { tab: "settings", label: locale === "ar" ? "الإعدادات" : "Paramètres", icon: Settings },
             ] as const).map((item) => {
@@ -285,12 +289,14 @@ export default function AdminPage() {
               : activeTab === "abandoned"
                 ? locale === "ar" ? "الطلبات المتروكة" : "Commandes abandonnées"
                 : activeTab === "products"
-                  ? locale === "ar" ? "إدارة المنتجات والمخزون" : "Gestion des produits et stock"
-                  : activeTab === "design"
-                    ? locale === "ar" ? "تخصيص تصميم المتجر والفئات وصفحة الشكر" : "Design du magasin, catégories et page de remerciement"
-                    : activeTab === "settings"
-                      ? locale === "ar" ? "إعدادات المتجر" : "Paramètres du magasin"
-                      : locale === "ar" ? "الرئيسية والإحصائيات" : "Accueil et statistiques"}
+                  ? locale === "ar" ? "إدارة المنتجات" : "Gestion des produits"
+                  : activeTab === "inventory"
+                    ? locale === "ar" ? "إدارة المخزون" : "Gestion du stock"
+                    : activeTab === "design"
+                      ? locale === "ar" ? "تخصيص تصميم المتجر والفئات وصفحة الشكر" : "Design du magasin, catégories et page de remerciement"
+                      : activeTab === "settings"
+                        ? locale === "ar" ? "إعدادات المتجر" : "Paramètres du magasin"
+                        : locale === "ar" ? "الرئيسية والإحصائيات" : "Accueil et statistiques"}
           </h1>
           <p className="mt-1 text-xs text-zinc-400 sm:text-sm">
             {activeTab === "orders"
@@ -298,12 +304,14 @@ export default function AdminPage() {
               : activeTab === "abandoned"
                 ? locale === "ar" ? "استرجاع ومتابعة الطلبات غير المكتملة" : "Suivi des paniers et commandes abandonnés"
                 : activeTab === "products"
-                  ? locale === "ar" ? "إدارة المنتجات، الأسعار، العروض الترويجية، ومراقبة المخزون" : "Gérez les produits, prix, réductions et stocks"
-                  : activeTab === "design"
-                    ? locale === "ar" ? "تعديل ألوان وشعار المتجر، إدارة الفئات وصورها، وتخصيص صفحة الشكر وسياسات الدفع والاستبدال" : "Personnalisez l'identité visuelle, les catégories avec photos, et la page de remerciement"
-                    : activeTab === "settings"
-                      ? locale === "ar" ? "إعدادات اللغة، بكسل الإعلانات، والشحن" : "Paramètres de langue, pixels publicitaires et livraison"
-                      : locale === "ar" ? "نظرة واضحة على نشاط المتجر وإحصائياته" : "Vue d’ensemble de l’activité et des statistiques"}
+                  ? locale === "ar" ? "إدارة وتعديل المنتجات، الأسعار، العروض الترويجية، والصور" : "Gérez les produits, prix, réductions et photos"
+                  : activeTab === "inventory"
+                    ? locale === "ar" ? "إدارة المنتجات والمخزون في متجرك" : "Gérez les stocks, variantes et références SKU de votre boutique"
+                    : activeTab === "design"
+                      ? locale === "ar" ? "تعديل ألوان وشعار المتجر، إدارة الفئات وصورها، وتخصيص صفحة الشكر وسياسات الدفع والاستبدال" : "Personnalisez l'identité visuelle, les catégories avec photos, et la page de remerciement"
+                      : activeTab === "settings"
+                        ? locale === "ar" ? "إعدادات اللغة، بكسل الإعلانات، والشحن" : "Paramètres de langue, pixels publicitaires et livraison"
+                        : locale === "ar" ? "نظرة واضحة على نشاط المتجر وإحصائياته" : "Vue d’ensemble de l’activité et des statistiques"}
           </p>
         </div>
         {/* View Switcher based on Tab */}
@@ -353,8 +361,8 @@ export default function AdminPage() {
                 </h1>
                 <p className="text-xs text-zinc-500">
                   {locale === "ar"
-                    ? "تعديل صور المنتجات، الأسعار، العروض الترويجية، المخزون، وتفعيل/تعطيل المنتجات"
-                    : "Gérez les photos, prix, packs de réduction et le stock de votre boutique"}
+                    ? "تعديل صور المنتجات، الأسعار، العروض الترويجية، وتفعيل/تعطيل المنتجات"
+                    : "Gérez les photos, prix, packs de réduction et la visibilité de vos produits"}
                 </p>
               </div>
             </div>
@@ -370,6 +378,15 @@ export default function AdminPage() {
               onToggleActive={toggleProductActive}
             />
           </div>
+        )}
+
+        {activeTab === "inventory" && (
+          <AdminInventoryView
+            products={products}
+            categories={categories}
+            onUpsertProduct={upsertProduct}
+            onSetVariantStock={setVariantStock}
+          />
         )}
 
         {activeTab === "design" && (
