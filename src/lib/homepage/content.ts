@@ -84,7 +84,8 @@ export function createDefaultHomepageContent(
           "Des pièces choisies, des matières sincères et une allure pensée pour chaque jour.",
           "قطع مختارة وخامات أصيلة وأناقة تناسب كل يوم.",
         ),
-        imageUrl: "/images/velora-fashion-watermark.svg",
+        imageUrl:
+          "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1600&q=85",
         primaryLabel: local("Découvrir la collection", "اكتشف جميع المنتجات"),
         primaryHref: "/products?view=all",
         secondaryLabel: local("Nos catégories", "تصفّح التصنيفات"),
@@ -119,7 +120,8 @@ export function createDefaultHomepageContent(
           "Nous choisissons des matières nobles et des coupes justes pour accompagner votre quotidien.",
           "نختار خامات نبيلة وقصّات متقنة لترافق تفاصيل يومك.",
         ),
-        imageUrl: "/images/velora-fashion-watermark.svg",
+        imageUrl:
+          "https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&w=1200&q=85",
         firstLinkLabel: local("La collection femme", "مجموعة النساء"),
         firstLinkHref: "/products?category=femme",
         secondLinkLabel: local("La collection homme", "مجموعة الرجال"),
