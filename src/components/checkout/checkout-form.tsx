@@ -20,6 +20,7 @@ import { LocaleLink } from "@/components/layout/language-switcher";
 import { useAbandonedCheckout } from "@/lib/orders/use-abandoned-checkout";
 import { trackPurchaseEvent } from "@/components/analytics/analytics-scripts";
 import { getAttributedTrafficSource } from "@/lib/analytics/traffic-source";
+import { sendTelegramOrderNotification } from "@/lib/notifications/order-notifier";
 
 export function CheckoutForm() {
   const { locale, dict } = useLocale();
@@ -192,6 +193,7 @@ export function CheckoutForm() {
     }
 
     addOrder(order);
+    void sendTelegramOrderNotification(order, useSettingsStore.getState().settings.telegram);
     trackPurchaseEvent({
       orderId: order.reference,
       total: order.total,

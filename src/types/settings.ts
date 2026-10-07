@@ -65,6 +65,20 @@ export interface StorefrontConfiguration {
   };
 }
 
+export interface TelegramNotificationSettings {
+  enabled: boolean;
+  botToken: string;
+  chatId: string;
+}
+
+export interface WhatsAppNotificationSettings {
+  enabled: boolean;
+  storePhone?: string;
+  autoOpenChat?: boolean;
+  orderTemplate?: string;
+  shippedTemplate?: string;
+}
+
 export interface StoreSettings {
   shippingType: "custom" | "fixed" | "free";
   defaultHomePrice: number;
@@ -74,6 +88,8 @@ export interface StoreSettings {
   ecotrack: EcoTrackSettings;
   nordEtOuest: NordEtOuestSettings;
   pixels: PixelSettings;
+  telegram?: TelegramNotificationSettings;
+  whatsapp?: WhatsAppNotificationSettings;
   storefront: StorefrontConfiguration;
 }
 

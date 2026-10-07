@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
 import { trackPurchaseEvent } from "@/components/analytics/analytics-scripts";
 import { captureTrafficSource, getAttributedTrafficSource } from "@/lib/analytics/traffic-source";
+import { sendTelegramOrderNotification } from "@/lib/notifications/order-notifier";
 
 interface QuickOrderFormProps {
   product: Product;
@@ -234,6 +235,7 @@ export function QuickOrderForm({
       }
 
       addOrder(newOrder);
+      void sendTelegramOrderNotification(newOrder, useSettingsStore.getState().settings.telegram);
       trackPurchaseEvent({
         orderId: newOrder.reference,
         total: newOrder.total,

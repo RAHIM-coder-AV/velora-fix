@@ -17,12 +17,15 @@ import {
   Languages,
   Globe,
   Palette,
+  Send,
+  MessageSquare,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useSettingsStore } from "@/stores/settings-store";
 import { PixelSettingsEditor } from "@/components/admin/pixel-settings-editor";
 import { AdminCategoriesSettings } from "@/components/admin/admin-categories-settings";
 import { AdminHomepageEditor } from "@/components/admin/admin-homepage-editor";
+import { AdminNotificationsSettings } from "@/components/admin/admin-notifications-settings";
 import type { Category, Product } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
 import { toast } from "@/components/ui/toast";
@@ -32,6 +35,7 @@ import { locales, type Locale } from "@/i18n/config";
 type SettingsSection =
   | "overview"
   | "delivery"
+  | "notifications"
   | "integrations"
   | "ecotrack"
   | "nord_ouest"
@@ -275,6 +279,7 @@ export function AdminSettingsView({
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {([
               { title: locale === "ar" ? "أسعار الشحن والتوصيل" : "Tarifs de livraison", description: locale === "ar" ? "تعديل أسعار المنزل والمكتب حسب 58 ولاية." : "Tarifs domicile et point relais par wilaya.", icon: Truck, tab: "delivery" as const },
+              { title: locale === "ar" ? "إشعارات الطلبات (Telegram & WhatsApp)" : "Notifications Telegram & WhatsApp", description: locale === "ar" ? "تنبيهات فورية في هاتفك عند كل طلب جديد ورسائل للزبائن." : "Alertes instantanées et messages WhatsApp.", icon: Send, tab: "notifications" as const },
               { title: locale === "ar" ? "الربط مع الخدمات" : "Intégrations", description: locale === "ar" ? "إعداد Meta Pixel وTikTok وخدمات الشحن." : "Meta Pixel, TikTok et transporteurs.", icon: Share2, tab: "integrations" as const },
               { title: locale === "ar" ? "تصميم وقالب المتجر" : "Design & Modèle de la boutique", description: locale === "ar" ? "تحرير محتوى الصفحة الرئيسية وقالب العرض والأقسام." : "Personnaliser l’accueil et le modèle de la boutique.", icon: Palette, tab: "homepage" as const },
               { title: locale === "ar" ? "لغات المتجر (العربية والفرنسية)" : "Langues (Arabe & Français)", description: locale === "ar" ? "إدارة لغة المتجر والتبديل بين العربية والفرنسية." : "Gérer les langues disponibles et la langue par défaut.", icon: Languages, tab: "languages" as const },
@@ -315,6 +320,19 @@ export function AdminSettingsView({
           >
             <Truck size={14} className="text-purple-600" />
             <span>{locale === "ar" ? "أسعار التوصيل" : "Livraison"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("notifications")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition ${
+              activeSubTab === "notifications"
+                ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
+                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+            }`}
+          >
+            <Send size={14} className="text-purple-400" />
+            <span>{locale === "ar" ? "الإشعارات (Telegram & WhatsApp)" : "Notifications"}</span>
           </button>
 
           <button
@@ -1035,6 +1053,7 @@ export function AdminSettingsView({
       )}
 
       {activeSubTab === "pixels" && <PixelSettingsEditor />}
+      {activeSubTab === "notifications" && <AdminNotificationsSettings />}
     </div>
   );
 }

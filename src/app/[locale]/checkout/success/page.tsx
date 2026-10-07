@@ -87,14 +87,28 @@ function CheckoutSuccessPageContent() {
           </div>
 
           {/* Call to Action Button */}
-          <div className="mt-8">
+          <div className="mt-8 space-y-3">
+            <a
+              href={`https://wa.me/${(useSettingsStore.getState().settings.whatsapp?.storePhone || "0697041176").replace(/[\s\-_]/g, "").replace(/^0/, "213")}?text=${encodeURIComponent(
+                locale === "ar"
+                  ? `مرحباً، قمت بتسجيل الطلب رقم #${ref} وأود متابعة وتأكيد الطلب معكم.`
+                  : `Bonjour, j'ai passé la commande #${ref} et je souhaite la confirmer.`
+              )}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 text-sm font-bold text-white shadow-lg shadow-emerald-600/25 transition hover:bg-emerald-700 active:scale-[0.98]"
+            >
+              <span>💬</span>
+              <span>{locale === "ar" ? "تواصل معنا عبر واتساب لتأكيد الطلب فوراً" : "Confirmer la commande sur WhatsApp"}</span>
+            </a>
+
             <LocaleLink
               href="/"
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-8 text-sm font-bold text-white shadow-lg shadow-purple-600/30 transition hover:from-purple-700 hover:to-indigo-700 active:scale-[0.98]"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-8 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 active:scale-[0.98]"
             >
-              <ShoppingBag size={18} />
+              <ShoppingBag size={16} />
               <span>{buttonLabel}</span>
-              {locale === "ar" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
+              {locale === "ar" ? <ArrowLeft size={14} /> : <ArrowRight size={14} />}
             </LocaleLink>
           </div>
 

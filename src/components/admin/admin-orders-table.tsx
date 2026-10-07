@@ -36,6 +36,7 @@ import { useLocale } from "@/providers/locale-provider";
 import { formatPrice, timeAgo } from "@/lib/utils";
 import { OrderDetailModal } from "@/components/admin/order-detail-modal";
 import { TrafficSourceBadge } from "@/components/admin/traffic-source-badge";
+import { openCustomerWhatsApp } from "@/lib/notifications/order-notifier";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useCatalogStore } from "@/stores/catalog-store";
@@ -1000,6 +1001,52 @@ export function AdminOrdersTable({
                                       : "bg-zinc-900 border-zinc-800 text-zinc-400"
                                   )}>
                                     {o.notes?.trim() ? o.notes : (locale === "ar" ? "بدون ملاحظة" : "Sans remarque")}
+                                  </div>
+                                </div>
+
+                                {/* WhatsApp Customer Quick Messaging Bar */}
+                                <div className="pt-2 border-t border-zinc-800">
+                                  <span className="text-zinc-400 block text-[10px] font-bold mb-1.5 flex items-center gap-1">
+                                    <span className="text-emerald-400">💬</span>
+                                    <span>{locale === "ar" ? "إرسال إشعار للعميل عبر الواتساب:" : "Notifier le client sur WhatsApp :"}</span>
+                                  </span>
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => openCustomerWhatsApp(o, "received")}
+                                      className="flex items-center justify-center gap-1 rounded-lg bg-emerald-950/60 border border-emerald-800/80 px-2 py-1.5 text-[10px] font-bold text-emerald-300 hover:bg-emerald-900/80 transition"
+                                      title="إرسال رسالة تم استلام طلبك بنجاح"
+                                    >
+                                      <span>📩</span>
+                                      <span>{locale === "ar" ? "استلام الطلب" : "Reçu"}</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => openCustomerWhatsApp(o, "confirmed")}
+                                      className="flex items-center justify-center gap-1 rounded-lg bg-teal-950/60 border border-teal-800/80 px-2 py-1.5 text-[10px] font-bold text-teal-300 hover:bg-teal-900/80 transition"
+                                      title="إرسال رسالة تم تأكيد طلبك"
+                                    >
+                                      <span>✅</span>
+                                      <span>{locale === "ar" ? "تم التأكيد" : "Confirmé"}</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => openCustomerWhatsApp(o, "shipped")}
+                                      className="flex items-center justify-center gap-1 rounded-lg bg-blue-950/60 border border-blue-800/80 px-2 py-1.5 text-[10px] font-bold text-blue-300 hover:bg-blue-900/80 transition"
+                                      title="إرسال رسالة طلبك في الطريق مع كود التتبع"
+                                    >
+                                      <span>🚚</span>
+                                      <span>{locale === "ar" ? "في الطريق" : "En route"}</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => openCustomerWhatsApp(o, "arrived")}
+                                      className="flex items-center justify-center gap-1 rounded-lg bg-amber-950/60 border border-amber-800/80 px-2 py-1.5 text-[10px] font-bold text-amber-300 hover:bg-amber-900/80 transition"
+                                      title="إرسال رسالة طردك وصل إلى ولايتك جاهز للاستلام"
+                                    >
+                                      <span>📦</span>
+                                      <span>{locale === "ar" ? "وصل للولاية" : "Arrivé"}</span>
+                                    </button>
                                   </div>
                                 </div>
                               </div>
