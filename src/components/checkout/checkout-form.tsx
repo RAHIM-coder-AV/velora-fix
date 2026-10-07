@@ -44,7 +44,7 @@ export function CheckoutForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [placed, setPlaced] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [contactConsent, setContactConsent] = useState(false);
+  const [contactConsent, setContactConsent] = useState(true);
 
   useEffect(() => {
     void refreshSharedSettings().catch((error) => console.error("Failed to load checkout settings", error));
@@ -231,19 +231,6 @@ export function CheckoutForm() {
       <div className="min-w-0 space-y-5">
         <h2 className="font-serif text-2xl">{dict.checkout.details}</h2>
         <p className="text-sm text-muted">{storefront.checkout.intro[locale]}</p>
-        <label className="flex items-start gap-2 rounded-lg border border-line p-3 text-xs leading-5 text-muted">
-          <input
-            type="checkbox"
-            checked={contactConsent}
-            onChange={(event) => setContactConsent(event.target.checked)}
-            className="mt-1"
-          />
-          <span>
-            {locale === "ar"
-              ? "أوافق اختيارياً على حفظ بيانات الاتصال التي أدخلها لاسترجاع الطلب غير المؤكد. لن تُرسل هذه البيانات إلى منصات الإعلانات."
-              : "J'accepte facultativement la sauvegarde de mes coordonnées pour retrouver ma commande non confirmée. Elles ne seront pas transmises aux plateformes publicitaires."}
-          </span>
-        </label>
         <Field label={dict.checkout.name} error={errors.name}>
           <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </Field>

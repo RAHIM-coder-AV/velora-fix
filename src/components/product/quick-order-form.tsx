@@ -87,7 +87,7 @@ export function QuickOrderForm({
   const [wilaya, setWilaya] = useState(ALGERIA_WILAYAS[15]?.nameAr || "16 - الجزائر");
   const [commune, setCommune] = useState("");
   const [address, setAddress] = useState("");
-  const [contactConsent, setContactConsent] = useState(false);
+  const [contactConsent, setContactConsent] = useState(true);
   const [deliveryType, setDeliveryType] = useState<"home" | "desk">("home");
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -273,19 +273,6 @@ export function QuickOrderForm({
         <p className="text-xs leading-5 text-zinc-600 dark:text-zinc-300">{storefront.productForm.intro[locale]}</p>
         {/* Customer Information Section */}
         <div className="space-y-3">
-          <label className="flex items-start gap-2 rounded-lg border border-zinc-200 p-3 text-[11px] leading-5 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
-            <input
-              type="checkbox"
-              checked={contactConsent}
-              onChange={(event) => setContactConsent(event.target.checked)}
-              className="mt-1"
-            />
-            <span>
-              {locale === "ar"
-                ? "أوافق اختيارياً على حفظ بيانات الاتصال التي أدخلها لاسترجاع الطلب غير المؤكد. لن تُرسل هذه البيانات إلى منصات الإعلانات."
-                : "J'accepte facultativement la sauvegarde de mes coordonnées pour retrouver ma commande non confirmée. Elles ne seront pas transmises aux plateformes publicitaires."}
-            </span>
-          </label>
           <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
             <User size={16} className="text-emerald-600" />
             {locale === "ar" ? "معلومات الزبون" : "Vos coordonnées"}
@@ -482,9 +469,74 @@ export function QuickOrderForm({
           </div>}
         </div>
 
+        {/* Variants (Size & Color) Placed ABOVE Offers */}
+        {(product.sizes.length > 0 || product.colors.length > 0) && (
+          <div className="space-y-3 rounded-xl border border-zinc-200/80 bg-zinc-50/80 p-3.5 dark:border-zinc-800 dark:bg-zinc-800/50">
+            {/* Sizes */}
+            {product.sizes.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  {locale === "ar" ? "المقاس المطلوب:" : "Taille :"}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {product.sizes.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => onSizeChange?.(s)}
+                      className={cn(
+                        "min-w-10 rounded-lg border px-3.5 py-1.5 text-xs font-bold transition",
+                        selectedSize === s
+                          ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                          : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                      )}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Colors */}
+            {product.colors.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  {locale === "ar" ? "اللون المفضل:" : "Couleur :"}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {product.colors.map((c) => {
+                    const isSelected = selectedColorHex?.toLowerCase() === c.hex.toLowerCase();
+                    return (
+                      <button
+                        key={c.hex}
+                        type="button"
+                        onClick={() => onColorChange?.(c.hex)}
+                        title={c.name[locale]}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition",
+                          isSelected
+                            ? "border-emerald-600 bg-emerald-50/40 text-emerald-900 ring-2 ring-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-200"
+                            : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                        )}
+                      >
+                        <span
+                          className="h-3.5 w-3.5 rounded-full border border-black/10 shrink-0"
+                          style={{ backgroundColor: c.hex }}
+                        />
+                        <span>{c.name[locale]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Offers / Packs Selection Section */}
         {offers.length > 0 && (
-          <div className="space-y-2.5 pt-2">
+          <div className="space-y-2.5 pt-1">
             <div className="flex items-center justify-between">
               <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
                 <Tag size={16} className="text-emerald-600" />
@@ -550,71 +602,6 @@ export function QuickOrderForm({
                 );
               })}
             </div>
-          </div>
-        )}
-
-        {/* Variants (Size & Color) if available */}
-        {(product.sizes.length > 1 || product.colors.length > 1) && (
-          <div className="space-y-3 rounded-lg bg-zinc-50 p-3.5 dark:bg-zinc-800/50">
-            {/* Sizes */}
-            {product.sizes.length > 1 && (
-              <div>
-                <p className="mb-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  {locale === "ar" ? "المقاس المطلوب:" : "Taille :"}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {product.sizes.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => onSizeChange?.(s)}
-                      className={cn(
-                        "min-w-10 rounded-md border px-3 py-1.5 text-xs font-semibold transition",
-                        selectedSize === s
-                          ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
-                          : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                      )}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Colors */}
-            {product.colors.length > 1 && (
-              <div>
-                <p className="mb-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  {locale === "ar" ? "اللون المفضل:" : "Couleur :"}
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {product.colors.map((c) => {
-                    const isSelected = selectedColorHex?.toLowerCase() === c.hex.toLowerCase();
-                    return (
-                      <button
-                        key={c.hex}
-                        type="button"
-                        onClick={() => onColorChange?.(c.hex)}
-                        title={c.name[locale]}
-                        className={cn(
-                          "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition",
-                          isSelected
-                            ? "border-emerald-600 ring-2 ring-emerald-500/30"
-                            : "border-zinc-300 hover:border-zinc-400 dark:border-zinc-700"
-                        )}
-                      >
-                        <span
-                          className="h-3.5 w-3.5 rounded-full border border-black/10"
-                          style={{ backgroundColor: c.hex }}
-                        />
-                        <span>{c.name[locale]}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
