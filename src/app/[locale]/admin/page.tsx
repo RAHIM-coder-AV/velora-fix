@@ -14,6 +14,7 @@ import {
   Palette,
   Warehouse,
   ChevronLeft,
+  User,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCatalogStore } from "@/stores/catalog-store";
@@ -27,13 +28,14 @@ import { AdminInventoryView } from "@/components/admin/admin-inventory-view";
 import { AdminHomepageEditor } from "@/components/admin/admin-homepage-editor";
 import { AdminStoreDesign } from "@/components/admin/admin-store-design";
 import { AdminSettingsView } from "@/components/admin/admin-settings-view";
+import { AdminAccountSettings } from "@/components/admin/admin-account-settings";
 import { cn } from "@/lib/utils";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
 import { getLocalProductsToImport } from "@/lib/catalog/catalog-sync";
 import { products as seedProducts } from "@/lib/catalog/seed";
 import { errorMessage } from "@/lib/errors";
 
-type AdminTab = "stats" | "orders" | "abandoned" | "products" | "inventory" | "design" | "settings";
+type AdminTab = "stats" | "orders" | "abandoned" | "products" | "inventory" | "design" | "settings" | "account";
 
 export default function AdminPage() {
   const { locale } = useLocale();
@@ -167,15 +169,20 @@ export default function AdminPage() {
           </div>
         </div>
         <div className="border-b border-zinc-800 px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-400/20 text-sm font-bold text-purple-200">
+          <button
+            type="button"
+            onClick={() => setActiveTab("account")}
+            className="flex w-full items-center gap-3 rounded-xl p-1.5 text-start transition hover:bg-zinc-800/60"
+            title={locale === "ar" ? "تعديل المعلومات الشخصية" : "Modifier mes informations"}
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-400/20 text-sm font-bold text-purple-200">
               {(user?.fullName || "V").slice(0, 1)}
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{user?.fullName || "Velora Admin"}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-white">{user?.fullName || "Velora Admin"}</p>
               <p className="text-[11px] text-zinc-500">{locale === "ar" ? "مدير المتجر" : "Administrateur"}</p>
             </div>
-          </div>
+          </button>
           <Link
             href={`/${locale}`}
             target="_blank"
@@ -194,6 +201,7 @@ export default function AdminPage() {
             { tab: "inventory", label: locale === "ar" ? "إدارة المخزون" : "Gestion du stock", icon: Warehouse, count: products.reduce((acc, p) => acc + (p.variants.some((v) => v.stock <= 5) ? 1 : 0), 0) || undefined },
             { tab: "design", label: locale === "ar" ? "تصميم المتجر" : "Design du magasin", icon: Palette },
             { tab: "settings", label: locale === "ar" ? "الإعدادات" : "Paramètres", icon: Settings },
+            { tab: "account", label: locale === "ar" ? "المعلومات الشخصية" : "Mon compte", icon: User },
           ] as const).map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.tab;
@@ -236,10 +244,14 @@ export default function AdminPage() {
           <div className="flex min-h-[68px] items-center justify-between gap-3 px-4 sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-500/20 font-serif text-lg text-purple-200 lg:hidden">V</div>
-              <div className="min-w-0">
+              <button
+                type="button"
+                onClick={() => setActiveTab("account")}
+                className="min-w-0 text-start"
+              >
                 <p className="truncate text-sm font-semibold text-zinc-100">{user?.fullName || "Velora Admin"}</p>
                 <p className="text-[11px] text-zinc-500">{locale === "ar" ? "لوحة إدارة المتجر" : "Espace de gestion"}</p>
-              </div>
+              </button>
             </div>
             <div className="flex items-center gap-2">
               <Link href={`/${locale}`} target="_blank" className="hidden min-h-10 items-center gap-2 rounded-full border border-zinc-700 px-4 text-xs font-semibold text-zinc-300 hover:border-purple-400 hover:text-white sm:flex">
@@ -260,6 +272,7 @@ export default function AdminPage() {
               { tab: "inventory", label: locale === "ar" ? "المخزون" : "Stock", icon: Warehouse },
               { tab: "design", label: locale === "ar" ? "التصميم" : "Design", icon: Palette },
               { tab: "settings", label: locale === "ar" ? "الإعدادات" : "Paramètres", icon: Settings },
+              { tab: "account", label: locale === "ar" ? "حسابي" : "Compte", icon: User },
             ] as const).map((item) => {
               const Icon = item.icon;
               return (
@@ -296,7 +309,9 @@ export default function AdminPage() {
                       ? locale === "ar" ? "تخصيص تصميم المتجر والفئات وصفحة الشكر" : "Design du magasin, catégories et page de remerciement"
                       : activeTab === "settings"
                         ? locale === "ar" ? "إعدادات المتجر" : "Paramètres du magasin"
-                        : locale === "ar" ? "الرئيسية والإحصائيات" : "Accueil et statistiques"}
+                        : activeTab === "account"
+                          ? locale === "ar" ? "المعلومات الشخصية وإعدادات الحساب" : "Informations personnelles et sécurité"
+                          : locale === "ar" ? "الرئيسية والإحصائيات" : "Accueil et statistiques"}
           </h1>
           <p className="mt-1 text-xs text-zinc-400 sm:text-sm">
             {activeTab === "orders"
@@ -311,7 +326,9 @@ export default function AdminPage() {
                       ? locale === "ar" ? "تعديل ألوان وشعار المتجر، إدارة الفئات وصورها، وتخصيص صفحة الشكر وسياسات الدفع والاستبدال" : "Personnalisez l'identité visuelle, les catégories avec photos, et la page de remerciement"
                       : activeTab === "settings"
                         ? locale === "ar" ? "إعدادات اللغة، بكسل الإعلانات، والشحن" : "Paramètres de langue, pixels publicitaires et livraison"
-                        : locale === "ar" ? "نظرة واضحة على نشاط المتجر وإحصائياته" : "Vue d’ensemble de l’activité et des statistiques"}
+                        : activeTab === "account"
+                          ? locale === "ar" ? "تعديل اسم الحساب، رقم الهاتف، البريد الإلكتروني، وتغيير كلمة المرور" : "Gérez vos informations de compte, coordonnées et mot de passe"
+                          : locale === "ar" ? "نظرة واضحة على نشاط المتجر وإحصائياته" : "Vue d’ensemble de l’activité et des statistiques"}
           </p>
         </div>
         {/* View Switcher based on Tab */}
@@ -415,6 +432,10 @@ export default function AdminPage() {
             onSaveCategory={upsertCategory}
             onDeleteCategory={deleteCategory}
           />
+        )}
+
+        {activeTab === "account" && (
+          <AdminAccountSettings />
         )}
       </main>
       </div>
