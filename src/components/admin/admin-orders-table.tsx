@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   Phone,
@@ -22,8 +22,13 @@ import {
   RotateCcw,
   CheckCheck,
   ChevronDown,
+  ChevronUp,
   Printer,
   Download,
+  FileText,
+  MessageSquare,
+  Sparkles,
+  ExternalLink,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Order, OrderStatus } from "@/types";
@@ -39,6 +44,14 @@ interface AdminOrdersTableProps {
   orders: Order[];
   onStatusChange: (orderId: string, status: OrderStatus) => void;
   onDeleteOrder: (orderId: string) => void;
+}
+
+interface FloatingDropdownState {
+  orderId: string;
+  top: number;
+  left?: number;
+  right?: number;
+  openUpwards: boolean;
 }
 
 export function AdminOrdersTable({
@@ -58,8 +71,24 @@ export function AdminOrdersTable({
   const [bulkDispatching, setBulkDispatching] = useState<"ecotrack" | "nord_ouest" | null>(null);
   const [singleDispatching, setSingleDispatching] = useState<string | null>(null);
   const dispatchingOrderIds = useRef(new Set<string>());
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  
+  // Floating dropdown state (fixed position attached to viewport to avoid table overflow clipping)
+  const [floatingDropdown, setFloatingDropdown] = useState<FloatingDropdownState | null>(null);
   const [bulkStatusToChange, setBulkStatusToChange] = useState<OrderStatus>("confirmed");
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
+  // Close floating dropdown on scroll or window resize
+  useEffect(() => {
+    function handleScrollOrResize() {
+      if (floatingDropdown) setFloatingDropdown(null);
+    }
+    window.addEventListener("scroll", handleScrollOrResize, true);
+    window.addEventListener("resize", handleScrollOrResize);
+    return () => {
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+      window.removeEventListener("resize", handleScrollOrResize);
+    };
+  }, [floatingDropdown]);
 
   // Filtered orders
   const filteredOrders = orders.filter((o) => {
@@ -80,7 +109,8 @@ export function AdminOrdersTable({
       o.phone.includes(query) ||
       o.wilaya.toLowerCase().includes(query) ||
       o.reference.toLowerCase().includes(query) ||
-      (o.trackingCode && o.trackingCode.toLowerCase().includes(query));
+      (o.trackingCode && o.trackingCode.toLowerCase().includes(query)) ||
+      (o.notes && o.notes.toLowerCase().includes(query));
     return matchesStatus && matchesSearch;
   });
 
@@ -199,6 +229,43 @@ export function AdminOrdersTable({
     { status: "delivered", labelAr: "مكتملة", labelFr: "Livrée", icon: CheckCheck },
   ];
 
+  // Open/toggle dropdown menu with fixed viewport coordinates
+  function handleToggleDropdown(e: React.MouseEvent<HTMLButtonElement>, orderId: string) {
+    e.stopPropagation();
+    if (floatingDropdown?.orderId === orderId) {
+      setFloatingDropdown(null);
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const dropdownHeight = 360;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpwards = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+
+    if (locale === "ar") {
+      const right = Math.max(12, Math.min(window.innerWidth - 275, window.innerWidth - rect.right));
+      setFloatingDropdown({
+        orderId,
+        top: openUpwards ? rect.top - 6 : rect.bottom + 6,
+        right,
+        openUpwards,
+      });
+    } else {
+      const left = Math.max(12, Math.min(window.innerWidth - 275, rect.left));
+      setFloatingDropdown({
+        orderId,
+        top: openUpwards ? rect.top - 6 : rect.bottom + 6,
+        left,
+        openUpwards,
+      });
+    }
+  }
+
+  function handleOrderStatusChange(orderId: string, newStatus: OrderStatus) {
+    onStatusChange(orderId, newStatus);
+    setFloatingDropdown(null);
+  }
+
   function toggleSelectAll() {
     if (selectedOrderIds.length === filteredOrders.length) {
       setSelectedOrderIds([]);
@@ -208,52 +275,25 @@ export function AdminOrdersTable({
   }
 
   function toggleSelectOrder(id: string) {
-    if (selectedOrderIds.includes(id)) {
-      setSelectedOrderIds(selectedOrderIds.filter((item) => item !== id));
-    } else {
-      setSelectedOrderIds([...selectedOrderIds, id]);
-    }
+    setSelectedOrderIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
   }
 
-  function handleOrderStatusChange(orderId: string, status: OrderStatus) {
-    const order = orders.find((item) => item.id === orderId);
-    onStatusChange(orderId, status);
-
-    if (
-      !order ||
-      order.trackingCode ||
-      (order.status === "confirmed" || order.status === "customer_confirmed") ||
-      (status !== "confirmed" && status !== "customer_confirmed")
-    ) {
-      return;
-    }
-
-    const automaticCompanies = [
-      ecotrack?.enabled && ecotrack.autoSendConfirmed ? "ecotrack" : null,
-      nordEtOuest?.enabled && nordEtOuest.autoSendConfirmed ? "nord_ouest" : null,
-    ].filter((company): company is "ecotrack" | "nord_ouest" => company !== null);
-    if (automaticCompanies.length > 1) {
-      toast(locale === "ar"
-        ? "فعّل الإرسال التلقائي لشركة واحدة فقط لتجنب إنشاء شحنتين للطلب."
-        : "Choisissez un seul transporteur pour éviter les doublons.");
-    } else if (automaticCompanies.length === 1) {
-      void handleSingleDispatch(order, automaticCompanies[0]);
-    }
-  }
-
+  // Single Order Dispatch
   async function handleSingleDispatch(order: Order, company: "ecotrack" | "nord_ouest") {
     const cfg = company === "ecotrack" ? ecotrack : nordEtOuest;
     const label = company === "ecotrack" ? "EcoTrack" : "Nord Et Ouest";
 
-    if (dispatchingOrderIds.current.has(order.id)) return;
     if (!cfg?.enabled || !cfg.token) {
-      toast(locale === "ar"
-        ? `فعّل الربط وأدخل رمز API حقيقيًا لـ ${label} في الإعدادات أولاً.`
-        : `Activez l'intégration et configurez un vrai jeton API ${label}.`);
+      toast(
+        locale === "ar"
+          ? `يرجى ضبط وتفعيل ربط ${label} في الإعدادات أولاً.`
+          : `Configurez et activez ${label} dans les paramètres d'abord.`
+      );
       return;
     }
 
-    dispatchingOrderIds.current.add(order.id);
     setSingleDispatching(order.id);
     try {
       const res = await fetch("/api/delivery/dispatch", {
@@ -261,8 +301,8 @@ export function AdminOrdersTable({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           company,
-          token: cfg?.token || "",
-          baseUrl: cfg?.baseUrl || "",
+          token: cfg.token,
+          baseUrl: cfg.baseUrl,
           orders: [
             {
               id: order.id,
@@ -291,111 +331,104 @@ export function AdminOrdersTable({
       const result = data.results?.[0];
 
       if (res.ok && result?.success && typeof result.trackingCode === "string") {
+        const tracking = result.trackingCode;
         try {
           await updateOrderDelivery(order.id, {
             deliveryCompany: company,
-            trackingCode: result.trackingCode,
+            trackingCode: tracking,
             status: "shipped",
             labelUrl: result.labelUrl,
           });
           onStatusChange(order.id, "shipped");
           toast(
             locale === "ar"
-              ? `تم إنشاء الشحنة (${order.reference}) لدى ${label}. كود التتبع: ${result.trackingCode}`
-              : `Commande envoyée à ${label}. Suivi : ${result.trackingCode}`
+              ? `تم رفع الطلب بنجاح إلى ${label}! كود التتبع: ${tracking}`
+              : `Commande expédiée via ${label} ! Suivi : ${tracking}`
           );
         } catch {
-          toast(locale === "ar"
-            ? `أُنشئت الشحنة (${result.trackingCode}) لكن تعذر حفظ بياناتها. لا تعاود الرفع كي لا تتكرر.`
-            : `Expédiée (${result.trackingCode}), mais la sauvegarde a échoué. Ne relancez pas l'envoi.`);
+          toast(
+            locale === "ar"
+              ? `أُنشئت الشحنة (${tracking}) لكن تعذر حفظها محلياً. لا تعاود الرفع.`
+              : `Expédiée (${tracking}), mais la sauvegarde a échoué.`
+          );
         }
       } else {
         toast(
           locale === "ar"
-            ? `❌ تعذر رفع الطلب: ${result?.error || data.error || "خطأ"}`
-            : `❌ Erreur: ${result?.error || data.error}`
+            ? `❌ فشل الرفع: ${result?.error || data.error || "خطأ غير معروف"}`
+            : `❌ Erreur : ${result?.error || data.error}`
         );
       }
     } catch {
       toast(locale === "ar" ? `فشل الاتصال بخادم ${label}` : `Erreur de connexion ${label}`);
     } finally {
-      dispatchingOrderIds.current.delete(order.id);
       setSingleDispatching(null);
     }
   }
 
+  // Bulk Dispatch
   async function handleBulkDispatch(company: "ecotrack" | "nord_ouest") {
-    if (selectedOrderIds.length === 0) {
-      toast(locale === "ar" ? "يرجى تحديد طلب واحد على الأقل" : "Veuillez sélectionner au moins une commande");
-      return;
-    }
     const cfg = company === "ecotrack" ? ecotrack : nordEtOuest;
     const label = company === "ecotrack" ? "EcoTrack" : "Nord Et Ouest";
+
     if (!cfg?.enabled || !cfg.token) {
-      toast(locale === "ar"
-        ? `فعّل الربط وأدخل رمز API حقيقيًا لـ ${label} في الإعدادات أولاً.`
-        : `Activez l'intégration et configurez un vrai jeton API ${label}.`);
+      toast(
+        locale === "ar"
+          ? `يرجى ضبط وتفعيل ربط ${label} في الإعدادات أولاً.`
+          : `Configurez et activez ${label} dans les paramètres d'abord.`
+      );
       return;
     }
 
-    const ordersToDispatch = orders.filter((o) => selectedOrderIds.includes(o.id));
-    if (ordersToDispatch.length !== selectedOrderIds.length) {
-      toast(locale === "ar" ? "تعذر العثور على جميع الطلبات المحددة." : "Certaines commandes sélectionnées sont introuvables.");
+    const selectedOrders = orders.filter((o) => selectedOrderIds.includes(o.id));
+    if (selectedOrders.length === 0) {
+      toast(locale === "ar" ? "يرجى تحديد طلب واحد على الأقل" : "Sélectionnez au moins une commande");
       return;
     }
 
     setBulkDispatching(company);
     try {
+      const ordersPayload = selectedOrders.map((o) => ({
+        id: o.id,
+        reference: o.reference,
+        customerName: o.customerName,
+        phone: o.phone,
+        phone2: o.phone2 || "",
+        wilaya: o.wilaya,
+        commune: o.commune,
+        address: o.address,
+        total: o.total,
+        shipping: o.shipping,
+        isStopdesk: o.isStopdesk || false,
+        notes: o.notes || "",
+        items: o.items.map((i) => ({
+          name: i.name,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+        })),
+      }));
+
       const res = await fetch("/api/delivery/dispatch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           company,
-          token: cfg?.token || "",
-          baseUrl: cfg?.baseUrl || "",
-          orders: ordersToDispatch.map((o) => ({
-            id: o.id,
-            reference: o.reference,
-            customerName: o.customerName,
-            phone: o.phone,
-            phone2: o.phone2 || "",
-            wilaya: o.wilaya,
-            commune: o.commune,
-            address: o.address,
-            total: o.total,
-            shipping: o.shipping,
-            isStopdesk: o.isStopdesk || false,
-            notes: o.notes || "",
-            items: o.items.map((i) => ({
-              name: i.name,
-              quantity: i.quantity,
-              unitPrice: i.unitPrice,
-            })),
-          })),
+          token: cfg.token,
+          baseUrl: cfg.baseUrl,
+          orders: ordersPayload,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok || !Array.isArray(data.results)) {
-        toast(locale === "ar"
-          ? `تعذر بدء الرفع: ${data.error || "استجابة غير صالحة من الخادم"}`
-          : `Échec de l'envoi : ${data.error || "réponse invalide du serveur"}`);
-        return;
-      }
+      const results: Array<{ orderId?: string; success: boolean; trackingCode?: string; labelUrl?: string; error?: string }> = data.results || [];
 
-      const resultsById = new Map<string, (typeof data.results)[number]>();
-      for (const result of data.results) {
-        if (typeof result?.orderId === "string" && !resultsById.has(result.orderId)) {
-          resultsById.set(result.orderId, result);
-        }
-      }
       let successCount = 0;
       let failCount = 0;
       let persistenceFailureCount = 0;
       const failedOrderIds: string[] = [];
 
-      for (const order of ordersToDispatch) {
-        const result = resultsById.get(order.id);
+      for (const order of selectedOrders) {
+        const result = results.find((r) => r.orderId === order.id);
         if (!result?.success || typeof result.trackingCode !== "string") {
           failCount++;
           failedOrderIds.push(order.id);
@@ -438,7 +471,7 @@ export function AdminOrdersTable({
       return;
     }
 
-    const headers = ["Reference", "Date", "Customer", "Phone", "Wilaya", "Commune", "Address", "Total", "Status", "DeliveryCompany", "TrackingCode"];
+    const headers = ["Reference", "Date", "Customer", "Phone", "Wilaya", "Commune", "Address", "Notes", "Total", "Status", "DeliveryCompany", "TrackingCode"];
     const rows = listToExport.map((o) => [
       `"${o.reference}"`,
       `"${new Date(o.createdAt).toLocaleDateString()}"`,
@@ -447,6 +480,7 @@ export function AdminOrdersTable({
       `"${o.wilaya.replace(/"/g, '""')}"`,
       `"${o.commune.replace(/"/g, '""')}"`,
       `"${(o.address || "").replace(/"/g, '""')}"`,
+      `"${(o.notes || "").replace(/"/g, '""')}"`,
       o.total,
       `"${o.status}"`,
       `"${o.deliveryCompany || ""}"`,
@@ -479,16 +513,10 @@ export function AdminOrdersTable({
     setSelectedOrderIds([]);
   }
 
+  const activeFloatingOrder = floatingDropdown ? orders.find((o) => o.id === floatingDropdown.orderId) : null;
+
   return (
     <div className="space-y-4">
-      {/* Click outside overlay to close dropdown */}
-      {openDropdownId && (
-        <div
-          className="fixed inset-0 z-20"
-          onClick={() => setOpenDropdownId(null)}
-        />
-      )}
-
       {/* Top Search & Filter Bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Search Input */}
@@ -496,14 +524,14 @@ export function AdminOrdersTable({
           <Search size={16} className="absolute start-3 top-3 text-zinc-400" />
           <input
             type="text"
-            placeholder={locale === "ar" ? "بحث برقم الهاتف، الاسم، الولاية، أو رقم التتبع..." : "Rechercher par nom, tél, wilaya, suivi..."}
+            placeholder={locale === "ar" ? "بحث برقم الهاتف، الاسم، الولاية، الملاحظات..." : "Rechercher par nom, tél, wilaya, note..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-xl border border-zinc-200 bg-white py-2 ps-9 pe-3 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-zinc-800 dark:bg-zinc-900"
           />
         </div>
 
-        {/* Filter Badges matching screenshot */}
+        {/* Filter Badges */}
         <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain pb-1 text-xs">
           {[
             { id: "all", label: locale === "ar" ? "الكل" : "Tous", count: orders.length },
@@ -519,7 +547,7 @@ export function AdminOrdersTable({
               key={tab.id}
               onClick={() => setStatusFilter(tab.id)}
               className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition",
+                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition shrink-0",
                 statusFilter === tab.id
                   ? "bg-purple-600 text-white shadow-sm"
                   : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
@@ -534,7 +562,7 @@ export function AdminOrdersTable({
         </div>
       </div>
 
-      {/* Bulk Action Bar matching Screenshot style */}
+      {/* Bulk Action Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex w-full flex-wrap items-center gap-2 text-xs font-bold text-zinc-700 sm:w-auto dark:text-zinc-300">
           <span className="rounded-lg bg-purple-100 px-2 py-1 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
@@ -635,7 +663,7 @@ export function AdminOrdersTable({
         <table className="w-full min-w-[760px] border-collapse text-right text-xs">
           <thead>
             <tr className="border-b border-zinc-200 bg-zinc-50/80 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-400">
-              <th className="py-3.5 px-4 text-center">
+              <th className="py-3.5 px-4 text-center w-10">
                 <input
                   type="checkbox"
                   checked={
@@ -669,106 +697,108 @@ export function AdminOrdersTable({
                 const badge = statusBadges[o.status] || statusBadges.pending;
                 const BadgeIcon = badge.icon;
                 const isSelected = selectedOrderIds.includes(o.id);
+                const isExpanded = expandedOrderId === o.id;
                 const phoneClean = o.phone.replace(/[\s\-_]/g, "");
-                const isDropdownOpen = openDropdownId === o.id;
 
                 return (
-                  <tr
-                    key={o.id}
-                    className={cn(
-                      "transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40",
-                      isSelected && "bg-purple-50/40 dark:bg-purple-950/20"
-                    )}
-                  >
-                    {/* Checkbox */}
-                    <td className="py-3.5 px-4 text-center">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelectOrder(o.id)}
-                        className="rounded border-zinc-300 text-purple-600 focus:ring-purple-500"
-                      />
-                    </td>
+                  <tr key={o.id} className="contents">
+                    {/* Main Row */}
+                    <tr
+                      className={cn(
+                        "transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40 cursor-pointer",
+                        isSelected && "bg-purple-50/40 dark:bg-purple-950/20",
+                        isExpanded && "bg-zinc-50/90 dark:bg-zinc-800/60 border-b-transparent"
+                      )}
+                      onClick={() => setExpandedOrderId(isExpanded ? null : o.id)}
+                    >
+                      {/* Checkbox */}
+                      <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectOrder(o.id)}
+                          className="rounded border-zinc-300 text-purple-600 focus:ring-purple-500"
+                        />
+                      </td>
 
-                    {/* Product Thumbnail */}
-                    <td className="py-3.5 px-3">
-                      <div className="flex items-center gap-2">
-                        <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
-                          {firstItem?.image ? (
-                            <Image
-                              src={firstItem.image}
-                              alt=""
-                              fill
-                              className="object-cover"
-                              sizes="40px"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-[10px] text-zinc-400">
-                              📦
-                            </div>
+                      {/* Product Thumbnail */}
+                      <td className="py-3.5 px-3">
+                        <div className="flex items-center gap-2">
+                          <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
+                            {firstItem?.image ? (
+                              <Image
+                                src={firstItem.image}
+                                alt=""
+                                fill
+                                className="object-cover"
+                                sizes="40px"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-[10px] text-zinc-400">
+                                📦
+                              </div>
+                            )}
+                          </div>
+                          {o.items.length > 1 && (
+                            <span className="rounded bg-zinc-200 px-1 py-0.5 text-[10px] font-bold dark:bg-zinc-700">
+                              +{o.items.length - 1}
+                            </span>
                           )}
                         </div>
-                        {o.items.length > 1 && (
-                          <span className="rounded bg-zinc-200 px-1 py-0.5 text-[10px] font-bold dark:bg-zinc-700">
-                            +{o.items.length - 1}
-                          </span>
+                      </td>
+
+                      {/* Customer Name */}
+                      <td className="py-3.5 px-3 font-semibold text-zinc-900 dark:text-zinc-100">
+                        <div>{o.customerName}</div>
+                        <div className="text-[10px] font-mono text-zinc-400">{o.reference}</div>
+                        {o.trackingCode && (
+                          <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-indigo-50 px-1.5 py-0.5 font-mono text-[9px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                            <Truck size={10} className="text-indigo-600" />
+                            <span>{o.deliveryCompany === "nord_ouest" ? "NO:" : "ECO:"}</span>
+                            <span>{o.trackingCode}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(o.trackingCode || "");
+                                toast(locale === "ar" ? "تم نسخ كود التتبع!" : "Code copié !");
+                              }}
+                              className="ms-0.5 hover:text-indigo-900"
+                              title={locale === "ar" ? "نسخ كود التتبع" : "Copier"}
+                            >
+                              <Copy size={9} />
+                            </button>
+                          </div>
                         )}
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Customer Name */}
-                    <td className="py-3.5 px-3 font-semibold text-zinc-900 dark:text-zinc-100">
-                      <div>{o.customerName}</div>
-                      <div className="text-[10px] font-mono text-zinc-400">{o.reference}</div>
-                      {o.trackingCode && (
-                        <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-indigo-50 px-1.5 py-0.5 font-mono text-[9px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
-                          <Truck size={10} className="text-indigo-600" />
-                          <span>{o.deliveryCompany === "nord_ouest" ? "NO:" : "ECO:"}</span>
-                          <span>{o.trackingCode}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(o.trackingCode || "");
-                              toast(locale === "ar" ? "تم نسخ كود التتبع!" : "Code copié !");
-                            }}
-                            className="ms-0.5 hover:text-indigo-900"
-                            title={locale === "ar" ? "نسخ كود التتبع" : "Copier"}
-                          >
-                            <Copy size={9} />
-                          </button>
-                        </div>
-                      )}
-                    </td>
+                      {/* Phone Number with Click-to-Call */}
+                      <td className="py-3.5 px-3" onClick={(e) => e.stopPropagation()}>
+                        <a
+                          href={`tel:${phoneClean}`}
+                          className="inline-flex items-center gap-1 font-mono font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+                          dir="ltr"
+                        >
+                          <Phone size={12} />
+                          <span>{o.phone}</span>
+                        </a>
+                      </td>
 
-                    {/* Phone Number with Click-to-Call */}
-                    <td className="py-3.5 px-3">
-                      <a
-                        href={`tel:${phoneClean}`}
-                        className="inline-flex items-center gap-1 font-mono font-medium text-emerald-700 hover:underline dark:text-emerald-400"
-                        dir="ltr"
-                      >
-                        <Phone size={12} />
-                        <span>{o.phone}</span>
-                      </a>
-                    </td>
+                      {/* Time Ago */}
+                      <td className="py-3.5 px-3 text-zinc-500 dark:text-zinc-400">
+                        {timeAgo(o.createdAt, locale)}
+                      </td>
 
-                    {/* Time Ago */}
-                    <td className="py-3.5 px-3 text-zinc-500 dark:text-zinc-400">
-                      {timeAgo(o.createdAt, locale)}
-                    </td>
+                      {/* Wilaya */}
+                      <td className="py-3.5 px-3 font-medium text-zinc-700 dark:text-zinc-300">
+                        {o.wilaya}
+                      </td>
 
-                    {/* Wilaya */}
-                    <td className="py-3.5 px-3 font-medium text-zinc-700 dark:text-zinc-300">
-                      {o.wilaya}
-                    </td>
-
-                    {/* Status Badge + Custom Dropdown Menu matching the user screenshot */}
-                    <td className="py-3.5 px-3">
-                      <div className="relative inline-block text-start">
-                        {/* Status Button / Dropdown Trigger */}
+                      {/* Status Badge + Custom Dropdown Menu */}
+                      <td className="py-3.5 px-3" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
-                          onClick={() => setOpenDropdownId(isDropdownOpen ? null : o.id)}
+                          onClick={(e) => handleToggleDropdown(e, o.id)}
                           className={cn(
                             "flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold shadow-xs transition hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500",
                             badge.bg
@@ -778,117 +808,187 @@ export function AdminOrdersTable({
                           <span>{badge.text}</span>
                           <ChevronDown size={11} className="opacity-70" />
                         </button>
+                      </td>
 
-                        {/* Interactive Dropdown Menu (Styled exactly as in reference screenshot) */}
-                        {isDropdownOpen && (
-                          <div
-                            className="absolute start-0 top-full z-30 mt-1.5 max-h-80 w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900 p-1.5 text-zinc-200 shadow-2xl"
-                            dir={locale === "ar" ? "rtl" : "ltr"}
+                      {/* Total Price */}
+                      <td className="py-3.5 px-3 font-serif font-bold text-zinc-900 dark:text-zinc-100">
+                        {formatPrice(o.total, locale)}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedOrderId(isExpanded ? null : o.id)}
+                            className={cn(
+                              "flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-semibold transition",
+                              isExpanded
+                                ? "bg-purple-700 text-white"
+                                : "text-zinc-600 hover:bg-zinc-100 hover:text-purple-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                            )}
+                            title={locale === "ar" ? "عرض / إخفاء تفاصيل وملاحظات الطلب" : "Afficher les détails et notes"}
                           >
-                            {/* Standard Statuses */}
-                            <div className="space-y-0.5">
-                              {statusDropdownOptions.map((opt) => {
-                                const OptIcon = opt.icon;
-                                const isCurrent = o.status === opt.status;
-                                return (
-                                  <button
-                                    key={opt.status}
-                                    type="button"
-                                    onClick={() => {
-                                      handleOrderStatusChange(o.id, opt.status);
-                                      setOpenDropdownId(null);
-                                      toast(
-                                        locale === "ar"
-                                          ? `تم تغيير حالة الطلب إلى "${opt.labelAr}"`
-                                          : `Statut changé en "${opt.labelFr}"`
-                                      );
-                                    }}
-                                    className={cn(
-                                      "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition hover:bg-zinc-800 text-start",
-                                      isCurrent ? "bg-purple-600/30 text-purple-300 font-bold" : "text-zinc-300"
-                                    )}
-                                  >
-                                    <OptIcon size={13} className={isCurrent ? "text-purple-400" : "text-zinc-400"} />
-                                    <span className="flex-1">{locale === "ar" ? opt.labelAr : opt.labelFr}</span>
-                                    {isCurrent && <Check size={12} className="text-purple-400" />}
-                                  </button>
-                                );
-                              })}
+                            <Eye size={14} />
+                            <span>{locale === "ar" ? "التفاصيل" : "Détails"}</span>
+                            {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteOrder(o.id)}
+                            className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+                            title={locale === "ar" ? "حذف" : "Supprimer"}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Inline Expanded Row matching screenshot */}
+                    {isExpanded && (
+                      <tr className="bg-[#141416] border-b border-zinc-800 text-zinc-200">
+                        <td colSpan={9} className="p-4 sm:p-5">
+                          <div className="grid gap-4 lg:grid-cols-3">
+                            
+                            {/* Col 1: Ordered Products Specs */}
+                            <div className="rounded-xl border border-zinc-800 bg-[#1a1a1e] p-4 space-y-3">
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                                <span>📦</span>
+                                <span>{locale === "ar" ? "المنتجات والمواصفات" : "Produits & Spécifications"}</span>
+                              </h4>
+                              <div className="space-y-3">
+                                {o.items.map((item) => (
+                                  <div key={item.id} className="flex items-start gap-3 rounded-lg border border-zinc-800/80 bg-[#222228] p-3">
+                                    <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-zinc-800">
+                                      {item.image ? (
+                                        <Image src={item.image} alt="" fill className="object-cover" sizes="56px" />
+                                      ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-xs">📦</div>
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0 text-xs space-y-1">
+                                      <p className="font-bold text-zinc-100 truncate">{item.name[locale] || item.name.ar}</p>
+                                      <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-zinc-400">
+                                        {item.size && <div><span className="text-zinc-500">{locale === "ar" ? "المقاس: " : "Taille: "}</span><span className="font-semibold text-zinc-200">{item.size}</span></div>}
+                                        {item.color && <div><span className="text-zinc-500">{locale === "ar" ? "اللون: " : "Couleur: "}</span><span className="font-semibold text-zinc-200">{item.color[locale] || item.color.ar}</span></div>}
+                                        <div><span className="text-zinc-500">{locale === "ar" ? "الكمية: " : "Qté: "}</span><span className="font-bold text-purple-300">{item.quantity}</span></div>
+                                        <div><span className="text-zinc-500">{locale === "ar" ? "السعر: " : "Prix: "}</span><span className="font-bold text-emerald-400">{formatPrice(item.unitPrice, locale)}</span></div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
 
-                            {/* Separator */}
-                            <div className="my-1.5 border-t border-zinc-800" />
-
-                            {/* Delivery Companies Direct Dispatch Options */}
-                            <div className="space-y-1">
-                              {/* Ecotrack dispatch */}
-                              <button
-                                type="button"
-                                disabled={singleDispatching === o.id}
-                                onClick={() => {
-                                  setOpenDropdownId(null);
-                                  void handleSingleDispatch(o, "ecotrack");
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg bg-emerald-950/40 border border-emerald-800/60 px-2.5 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-900/60 text-start"
-                              >
-                                {singleDispatching === o.id ? (
-                                  <span className="animate-spin text-sm">⏳</span>
-                                ) : (
-                                  <Truck size={14} className="text-emerald-400" />
+                            {/* Col 2: Customer Data + Notes Section */}
+                            <div className="rounded-xl border border-zinc-800 bg-[#1a1a1e] p-4 space-y-3">
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                                <span>👤</span>
+                                <span>{locale === "ar" ? "بيانات العميل والملاحظات" : "Client & Notes"}</span>
+                              </h4>
+                              
+                              <div className="space-y-2 text-xs">
+                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                                  <span className="text-zinc-400">{locale === "ar" ? "الاسم الكامل:" : "Nom :"}</span>
+                                  <span className="font-bold text-zinc-100">{o.customerName}</span>
+                                </div>
+                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                                  <span className="text-zinc-400">{locale === "ar" ? "رقم الهاتف:" : "Téléphone :"}</span>
+                                  <a href={`tel:${phoneClean}`} className="font-mono font-bold text-emerald-400 hover:underline">
+                                    {o.phone}
+                                  </a>
+                                </div>
+                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                                  <span className="text-zinc-400">{locale === "ar" ? "الولاية والبلدية:" : "Wilaya / Commune :"}</span>
+                                  <span className="font-medium text-zinc-200">{o.wilaya} — {o.commune || ""}</span>
+                                </div>
+                                {o.address && (
+                                  <div className="border-b border-zinc-800 pb-2">
+                                    <span className="text-zinc-400 block text-[10px]">{locale === "ar" ? "العنوان:" : "Adresse :"}</span>
+                                    <span className="font-medium text-zinc-300">{o.address}</span>
+                                  </div>
                                 )}
-                                <span>{locale === "ar" ? "رفع إلى شركة التوصيل Ecotrack" : "Expédier via EcoTrack"}</span>
-                              </button>
 
-                              {/* Nord Et Ouest dispatch */}
-                              <button
-                                type="button"
-                                disabled={singleDispatching === o.id}
-                                onClick={() => {
-                                  setOpenDropdownId(null);
-                                  void handleSingleDispatch(o, "nord_ouest");
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg bg-blue-950/40 border border-blue-800/60 px-2.5 py-2 text-xs font-bold text-blue-300 transition hover:bg-blue-900/60 text-start"
-                              >
-                                {singleDispatching === o.id ? (
-                                  <span className="animate-spin text-sm">⏳</span>
-                                ) : (
-                                  <Truck size={14} className="text-blue-400" />
-                                )}
-                                <span>{locale === "ar" ? "رفع إلى شركة التوصيل Nord Et Ouest" : "Expédier via Nord Et Ouest"}</span>
-                              </button>
+                                {/* Customer Notes / Remarks (لائحة الملاحظات) */}
+                                <div className="pt-1">
+                                  <span className="text-zinc-400 block text-[10px] font-bold mb-1 flex items-center gap-1.5">
+                                    <MessageSquare size={12} className="text-emerald-400" />
+                                    <span>{locale === "ar" ? "ملاحظة العميل:" : "Note du client :"}</span>
+                                  </span>
+                                  <div className={cn(
+                                    "rounded-lg p-2.5 text-xs font-semibold leading-relaxed border",
+                                    o.notes?.trim()
+                                      ? "bg-emerald-950/40 border-emerald-700/60 text-emerald-300"
+                                      : "bg-zinc-900 border-zinc-800 text-zinc-400"
+                                  )}>
+                                    {o.notes?.trim() ? o.notes : (locale === "ar" ? "بدون ملاحظة" : "Sans remarque")}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
+
+                            {/* Col 3: Order Lifecycle, Totals & Quick Actions */}
+                            <div className="rounded-xl border border-zinc-800 bg-[#1a1a1e] p-4 flex flex-col justify-between space-y-4">
+                              <div className="space-y-3">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                                  <span>💳</span>
+                                  <span>{locale === "ar" ? "ملخص الحساب والحالة" : "Paiement & Statut"}</span>
+                                </h4>
+
+                                <div className="space-y-1.5 text-xs">
+                                  <div className="flex justify-between text-zinc-400">
+                                    <span>{locale === "ar" ? "قيمة المنتجات:" : "Sous-total :"}</span>
+                                    <span>{formatPrice(o.subtotal, locale)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-zinc-400">
+                                    <span>{locale === "ar" ? "رسوم التوصيل:" : "Livraison :"}</span>
+                                    <span>{formatPrice(o.shipping, locale)}</span>
+                                  </div>
+                                  <div className="flex justify-between border-t border-zinc-800 pt-2 font-bold text-sm text-zinc-100">
+                                    <span>{locale === "ar" ? "المجموع الكلي:" : "Total :"}</span>
+                                    <span className="text-emerald-400 font-serif">{formatPrice(o.total, locale)}</span>
+                                  </div>
+                                </div>
+
+                                <div className="rounded-lg bg-zinc-900/90 border border-zinc-800 p-2.5 text-[11px] text-zinc-400 space-y-1">
+                                  <div className="flex justify-between">
+                                    <span>{locale === "ar" ? "استلام الطلب:" : "Reçu le :"}</span>
+                                    <span className="font-mono text-zinc-200">{new Date(o.createdAt).toLocaleString(locale === "ar" ? "ar-DZ" : "fr-DZ")}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>{locale === "ar" ? "طريقة الاستلام:" : "Mode :"}</span>
+                                    <span className="font-bold text-zinc-200">{o.isStopdesk ? (locale === "ar" ? "مكتب Stop Desk" : "Stop Desk") : (locale === "ar" ? "توصيل للمنزل" : "À domicile")}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex flex-wrap gap-2 pt-2 border-t border-zinc-800">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedOrder(o)}
+                                  className="flex-1 min-h-9 flex items-center justify-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-sm transition active:scale-95"
+                                >
+                                  <Eye size={14} />
+                                  <span>{locale === "ar" ? "تعديل الطلب والرفع" : "Modifier & Expédier"}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleToggleDropdown(e, o.id)}
+                                  className="min-h-9 px-3 flex items-center gap-1 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition"
+                                >
+                                  <span>{locale === "ar" ? "تغيير الحالة" : "Changer statut"}</span>
+                                  <ChevronDown size={12} />
+                                </button>
+                              </div>
+
+                            </div>
+
                           </div>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Total Price */}
-                    <td className="py-3.5 px-3 font-serif font-bold text-zinc-900 dark:text-zinc-100">
-                      {formatPrice(o.total, locale)}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="py-3.5 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOrder(o)}
-                          className="flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-[11px] font-semibold text-zinc-600 hover:bg-zinc-100 hover:text-purple-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                          title={locale === "ar" ? "تفاصيل الطلب والتعديل ورفع الشحن" : "Détails, modification et expédition"}
-                        >
-                          <Eye size={15} />
-                          <span>{locale === "ar" ? "التفاصيل" : "Détails"}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDeleteOrder(o.id)}
-                          className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
-                          title={locale === "ar" ? "حذف" : "Supprimer"}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
+                        </td>
+                      </tr>
+                    )}
                   </tr>
                 );
               })
@@ -896,6 +996,113 @@ export function AdminOrdersTable({
           </tbody>
         </table>
       </div>
+
+      {/* Floating Status & Dispatch Dropdown Menu (Fixed in Viewport to never be clipped) */}
+      {floatingDropdown && activeFloatingOrder && (
+        <>
+          {/* Transparent Backdrop to close */}
+          <div
+            className="fixed inset-0 z-[9998] bg-black/20 backdrop-blur-[1px]"
+            onClick={() => setFloatingDropdown(null)}
+          />
+
+          {/* Floating Menu */}
+          <div
+            style={{
+              position: "fixed",
+              top: floatingDropdown.openUpwards ? "auto" : `${floatingDropdown.top}px`,
+              bottom: floatingDropdown.openUpwards ? `${window.innerHeight - floatingDropdown.top}px` : "auto",
+              left: floatingDropdown.left !== undefined ? `${floatingDropdown.left}px` : "auto",
+              right: floatingDropdown.right !== undefined ? `${floatingDropdown.right}px` : "auto",
+            }}
+            className="z-[9999] max-h-[380px] w-64 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-2xl border border-zinc-700/80 bg-[#1c1a22] p-2 text-zinc-100 shadow-2xl backdrop-blur-md"
+            dir={locale === "ar" ? "rtl" : "ltr"}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-2 py-1 mb-1 text-[10px] font-bold text-zinc-400 border-b border-zinc-800">
+              {locale === "ar" ? "تغيير حالة الطلب:" : "Changer le statut :"}
+            </div>
+
+            {/* Standard Statuses */}
+            <div className="space-y-0.5">
+              {statusDropdownOptions.map((opt) => {
+                const OptIcon = opt.icon;
+                const isCurrent = activeFloatingOrder.status === opt.status;
+                return (
+                  <button
+                    key={opt.status}
+                    type="button"
+                    onClick={() => {
+                      handleOrderStatusChange(activeFloatingOrder.id, opt.status);
+                      toast(
+                        locale === "ar"
+                          ? `تم تغيير حالة الطلب إلى "${opt.labelAr}"`
+                          : `Statut changé en "${opt.labelFr}"`
+                      );
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition text-start",
+                      isCurrent
+                        ? "bg-purple-600/40 text-purple-300 font-bold border border-purple-500/40"
+                        : "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                    )}
+                  >
+                    <OptIcon size={13} className={isCurrent ? "text-purple-400" : "text-zinc-400"} />
+                    <span className="flex-1">{locale === "ar" ? opt.labelAr : opt.labelFr}</span>
+                    {isCurrent && <Check size={12} className="text-purple-400" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Separator */}
+            <div className="my-2 border-t border-zinc-800" />
+
+            {/* Delivery Companies Direct Dispatch Options */}
+            <div className="space-y-1">
+              <div className="px-2 py-0.5 text-[10px] font-bold text-zinc-400">
+                {locale === "ar" ? "الرفع المباشر لشركات التوصيل:" : "Expédition directe :"}
+              </div>
+
+              {/* Ecotrack dispatch */}
+              <button
+                type="button"
+                disabled={singleDispatching === activeFloatingOrder.id}
+                onClick={() => {
+                  setFloatingDropdown(null);
+                  void handleSingleDispatch(activeFloatingOrder, "ecotrack");
+                }}
+                className="flex w-full items-center gap-2 rounded-xl bg-emerald-950/50 border border-emerald-700/60 px-2.5 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-900/70 text-start"
+              >
+                {singleDispatching === activeFloatingOrder.id ? (
+                  <span className="animate-spin text-sm">⏳</span>
+                ) : (
+                  <Truck size={14} className="text-emerald-400" />
+                )}
+                <span>{locale === "ar" ? "رفع إلى شركة التوصيل Ecotrack" : "Expédier via EcoTrack"}</span>
+              </button>
+
+              {/* Nord Et Ouest dispatch */}
+              <button
+                type="button"
+                disabled={singleDispatching === activeFloatingOrder.id}
+                onClick={() => {
+                  setFloatingDropdown(null);
+                  void handleSingleDispatch(activeFloatingOrder, "nord_ouest");
+                }}
+                className="flex w-full items-center gap-2 rounded-xl bg-blue-950/50 border border-blue-700/60 px-2.5 py-2 text-xs font-bold text-blue-300 transition hover:bg-blue-900/70 text-start"
+              >
+                {singleDispatching === activeFloatingOrder.id ? (
+                  <span className="animate-spin text-sm">⏳</span>
+                ) : (
+                  <Truck size={14} className="text-blue-400" />
+                )}
+                <span>{locale === "ar" ? "رفع إلى شركة التوصيل Nord Et Ouest" : "Expédier via Nord Et Ouest"}</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Order Detail Modal */}
       {selectedOrder && (

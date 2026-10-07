@@ -521,6 +521,16 @@ export function OrderDetailModal({
                         <option value="desk">{locale === "ar" ? "استلام من المكتب" : "Point relais"}</option>
                       </select>
                     </label>
+                    <label className="space-y-1 text-xs font-semibold sm:col-span-2">
+                      <span>{locale === "ar" ? "ملاحظة العميل / الطلب" : "Note du client / Commande"}</span>
+                      <textarea
+                        value={editedOrder.notes || ""}
+                        onChange={(event) => setEditedOrder({ ...editedOrder, notes: event.target.value })}
+                        rows={2}
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                        placeholder={locale === "ar" ? "أدخل ملاحظات حول هذا الطلب..." : "Notes sur cette commande..."}
+                      />
+                    </label>
                   </div>
 
                   <div className="space-y-2">
@@ -604,6 +614,22 @@ export function OrderDetailModal({
                   </span>
                 </div>
               )}
+
+              {/* Customer Notes / Remarks Section */}
+              <div className="sm:col-span-2 rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800/80">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-600 dark:text-zinc-300 mb-1">
+                  <span>📝</span>
+                  <span>{locale === "ar" ? "ملاحظة العميل / الطلب:" : "Note du client / Commande :"}</span>
+                </div>
+                <div className={cn(
+                  "rounded-lg p-2.5 text-xs font-semibold leading-relaxed border",
+                  order.notes?.trim()
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:text-emerald-300"
+                    : "bg-zinc-50 border-zinc-200 text-zinc-500 dark:bg-zinc-900/60 dark:border-zinc-800 dark:text-zinc-400"
+                )}>
+                  {order.notes?.trim() ? order.notes : (locale === "ar" ? "بدون ملاحظة" : "Sans remarque")}
+                </div>
+              </div>
             </div>
 
             {order.offerTitle && (
@@ -690,14 +716,22 @@ export function OrderDetailModal({
               onChange={(e) => onStatusChange(e.target.value as OrderStatus)}
               className="rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-purple-800 dark:bg-zinc-800 dark:text-purple-200"
             >
-              <option value="pending">{locale === "ar" ? "قيد الانتظار" : "En attente"}</option>
-              <option value="confirmed">{locale === "ar" ? "مؤكد" : "Confirmée"}</option>
+              <option value="pending">{locale === "ar" ? "جديد (قيد الانتظار)" : "Nouveau (En attente)"}</option>
+              <option value="pending_confirmation">{locale === "ar" ? "قيد التأكيد" : "En confirmation"}</option>
+              <option value="confirmed">{locale === "ar" ? "مؤكدة" : "Confirmée"}</option>
+              <option value="customer_confirmed">{locale === "ar" ? "مؤكدة من قبل العميل" : "Confirmée par client"}</option>
               <option value="processing">{locale === "ar" ? "قيد المعالجة" : "En préparation"}</option>
-              <option value="shipped">{locale === "ar" ? "في التوصيل" : "Expédiée"}</option>
-              <option value="delivered">{locale === "ar" ? "تم التوصيل" : "Livrée"}</option>
-              <option value="cancelled">{locale === "ar" ? "ملغى" : "Annulée"}</option>
-              <option value="no_answer">{locale === "ar" ? "لا يرد" : "Pas de réponse"}</option>
-              <option value="postponed">{locale === "ar" ? "مؤجل" : "Reportée"}</option>
+              <option value="shipped">{locale === "ar" ? "عند شركة التوصيل" : "Chez livreur"}</option>
+              <option value="delivered">{locale === "ar" ? "مكتملة" : "Livrée"}</option>
+              <option value="cancelled">{locale === "ar" ? "ملغاة" : "Annulée"}</option>
+              <option value="customer_cancelled">{locale === "ar" ? "ملغاة من قبل العميل" : "Annulée par client"}</option>
+              <option value="no_answer">{locale === "ar" ? "لم يرد على الاتصال" : "Ne répond pas"}</option>
+              <option value="postponed">{locale === "ar" ? "مؤجلة" : "Reportée"}</option>
+              <option value="waiting_customer">{locale === "ar" ? "في انتظار اتصال العميل" : "En attente client"}</option>
+              <option value="busy">{locale === "ar" ? "الخط مشغول" : "Ligne occupée"}</option>
+              <option value="fake">{locale === "ar" ? "طلب مزيف" : "Fausse commande"}</option>
+              <option value="duplicate">{locale === "ar" ? "مكرر" : "Doublon"}</option>
+              <option value="returned">{locale === "ar" ? "مرجع" : "Retournée"}</option>
             </select>
           </div>
         </div>
