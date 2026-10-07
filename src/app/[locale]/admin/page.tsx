@@ -14,7 +14,12 @@ import {
   Palette,
   Warehouse,
   ChevronLeft,
+  ChevronDown,
   User,
+  Trash2,
+  Crown,
+  RefreshCw,
+  Sparkles,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCatalogStore } from "@/stores/catalog-store";
@@ -29,6 +34,7 @@ import { AdminHomepageEditor } from "@/components/admin/admin-homepage-editor";
 import { AdminStoreDesign } from "@/components/admin/admin-store-design";
 import { AdminSettingsView } from "@/components/admin/admin-settings-view";
 import { AdminAccountSettings } from "@/components/admin/admin-account-settings";
+import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
 import { getLocalProductsToImport } from "@/lib/catalog/catalog-sync";
@@ -65,6 +71,33 @@ export default function AdminPage() {
 
   const [activeTab, setActiveTab] = useState<AdminTab>("stats");
   const [adminLoginError, setAdminLoginError] = useState("");
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [isClearingCache, setIsClearingCache] = useState(false);
+
+  async function handleClearCache() {
+    setIsClearingCache(true);
+    try {
+      if (typeof window !== "undefined" && "caches" in window) {
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+      }
+      if (typeof window !== "undefined") {
+        sessionStorage.clear();
+      }
+      toast(
+        locale === "ar"
+          ? "تم حذف الكاش بنجاح! جاري تحديث الصفحة..."
+          : "Cache vidé avec succès ! Rechargement de la page..."
+      );
+    } catch (err) {
+      console.error("Cache clear error:", err);
+      toast(locale === "ar" ? "تم تفريغ الكاش" : "Cache vidé");
+    } finally {
+      setTimeout(() => {
+        window.location.reload();
+      }, 700);
+    }
+  }
 
   async function loginDemoAdmin() {
     setAdminLoginError("");
@@ -242,18 +275,146 @@ export default function AdminPage() {
       <div className={cn("min-h-screen", locale === "ar" ? "lg:pr-64" : "lg:pl-64")}>
         <header className="sticky top-0 z-30 border-b border-zinc-800 bg-[#141414]/95 backdrop-blur-md">
           <div className="flex min-h-[68px] items-center justify-between gap-3 px-4 sm:px-6">
-            <div className="flex min-w-0 items-center gap-3">
+            <div className="relative flex min-w-0 items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-500/20 font-serif text-lg text-purple-200 lg:hidden">V</div>
+              
+              {/* Profile Dropdown Toggle */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                  className="flex items-center gap-2 rounded-xl border border-zinc-800/80 bg-zinc-900/80 px-3 py-1.5 text-start transition hover:border-purple-500/40 hover:bg-zinc-800"
+                >
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-purple-500/20 text-xs font-bold text-purple-200">
+                    <User size={14} />
+                  </div>
+                  <div className="min-w-0 hidden sm:block">
+                    <p className="truncate text-xs font-semibold text-zinc-100">{user?.fullName || "Abderrahim kouriche"}</p>
+                    <p className="text-[10px] text-zinc-500">{locale === "ar" ? "مدير المتجر" : "Administrateur"}</p>
+                  </div>
+                  <ChevronDown size={14} className={cn("text-zinc-400 transition-transform duration-200", profileMenuOpen && "rotate-180")} />
+                </button>
+
+                {/* Profile Popup Menu */}
+                {profileMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setProfileMenuOpen(false)}
+                    />
+                    <div
+                      className={cn(
+                        "absolute top-full mt-2 z-50 w-72 rounded-2xl border border-zinc-700/80 bg-[#161616] p-3 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150",
+                        locale === "ar" ? "right-0" : "left-0"
+                      )}
+                    >
+                      {/* User Info Card */}
+                      <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/60 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-sm font-bold text-white">{user?.fullName || "Abderrahim kouriche"}</p>
+                          <span className="shrink-0 rounded-full bg-purple-500/20 px-2 py-0.5 text-[10px] font-semibold text-purple-300">
+                            {locale === "ar" ? "المتجر" : "Boutique"}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-zinc-400">{user?.email || "azrtefsgy@gmail.com"}</p>
+                        
+                        <div className="mt-2.5 flex items-center justify-between border-t border-zinc-800/80 pt-2 text-[11px] text-zinc-400">
+                          <span className="flex items-center gap-1 text-emerald-400">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                            {locale === "ar" ? "تاريخ الانتهاء: 11 أيام" : "Expire dans: 11 jours"}
+                          </span>
+                          <Link
+                            href={`/${locale}`}
+                            target="_blank"
+                            onClick={() => setProfileMenuOpen(false)}
+                            className="text-purple-300 hover:text-purple-200 font-semibold underline underline-offset-2"
+                          >
+                            {locale === "ar" ? "عرض المتجر" : "Voir"}
+                          </Link>
+                        </div>
+                      </div>
+
+                      {/* Menu List */}
+                      <div className="mt-2 space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProfileMenuOpen(false);
+                            toast(locale === "ar" ? "الاشتراك نشط ومفعل" : "Abonnement actif");
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800/80 hover:text-white"
+                        >
+                          <Crown size={15} className="text-amber-400" />
+                          <span>{locale === "ar" ? "إدارة الاشتراك" : "Gestion de l'abonnement"}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProfileMenuOpen(false);
+                            void handleClearCache();
+                          }}
+                          disabled={isClearingCache}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800/80 hover:text-white"
+                        >
+                          {isClearingCache ? (
+                            <RefreshCw size={15} className="animate-spin text-purple-400" />
+                          ) : (
+                            <Trash2 size={15} className="text-purple-400" />
+                          )}
+                          <span>{locale === "ar" ? "حذف الكاش" : "Vider le cache"}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProfileMenuOpen(false);
+                            setActiveTab("account");
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800/80 hover:text-white"
+                        >
+                          <Settings size={15} className="text-zinc-400" />
+                          <span>{locale === "ar" ? "إعدادات الحساب" : "Paramètres du compte"}</span>
+                        </button>
+                      </div>
+
+                      <div className="mt-2 border-t border-zinc-800/80 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProfileMenuOpen(false);
+                            void logout();
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-red-400 transition hover:bg-red-950/40 hover:text-red-300"
+                        >
+                          <LogOut size={15} />
+                          <span>{locale === "ar" ? "تسجيل الخروج" : "Déconnexion"}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Header Action Buttons */}
+            <div className="flex items-center gap-2">
+              {/* Direct Clear Cache Button */}
               <button
                 type="button"
-                onClick={() => setActiveTab("account")}
-                className="min-w-0 text-start"
+                onClick={() => void handleClearCache()}
+                disabled={isClearingCache}
+                title={locale === "ar" ? "حذف وتفريغ كاش المتصفح" : "Vider le cache du navigateur"}
+                className="flex min-h-10 items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-3.5 text-xs font-semibold text-purple-300 transition hover:border-purple-400 hover:bg-purple-500/20 active:scale-95"
               >
-                <p className="truncate text-sm font-semibold text-zinc-100">{user?.fullName || "Velora Admin"}</p>
-                <p className="text-[11px] text-zinc-500">{locale === "ar" ? "لوحة إدارة المتجر" : "Espace de gestion"}</p>
+                {isClearingCache ? (
+                  <RefreshCw size={14} className="animate-spin text-purple-300" />
+                ) : (
+                  <Trash2 size={14} className="text-purple-300" />
+                )}
+                <span>{locale === "ar" ? "حذف الكاش" : "Vider le cache"}</span>
               </button>
-            </div>
-            <div className="flex items-center gap-2">
+
               <Link href={`/${locale}`} target="_blank" className="hidden min-h-10 items-center gap-2 rounded-full border border-zinc-700 px-4 text-xs font-semibold text-zinc-300 hover:border-purple-400 hover:text-white sm:flex">
                 <ExternalLink size={14} />
                 {locale === "ar" ? "زيارة المتجر" : "Voir la boutique"}
