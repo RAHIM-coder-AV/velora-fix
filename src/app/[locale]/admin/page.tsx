@@ -24,6 +24,7 @@ import { AdminAbandonedCheckouts } from "@/components/admin/admin-abandoned-chec
 import { isUndeliveredOrder } from "@/lib/orders/abandoned";
 import { AdminProductsTable } from "@/components/admin/admin-products-table";
 import { AdminHomepageEditor } from "@/components/admin/admin-homepage-editor";
+import { AdminStoreDesign } from "@/components/admin/admin-store-design";
 import { AdminSettingsView } from "@/components/admin/admin-settings-view";
 import { cn } from "@/lib/utils";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
@@ -31,7 +32,7 @@ import { getLocalProductsToImport } from "@/lib/catalog/catalog-sync";
 import { products as seedProducts } from "@/lib/catalog/seed";
 import { errorMessage } from "@/lib/errors";
 
-type AdminTab = "stats" | "orders" | "abandoned" | "products" | "settings";
+type AdminTab = "stats" | "orders" | "abandoned" | "products" | "design" | "settings";
 
 export default function AdminPage() {
   const { locale } = useLocale();
@@ -187,23 +188,17 @@ export default function AdminPage() {
             { tab: "stats", label: locale === "ar" ? "الرئيسية" : "Accueil", icon: LayoutDashboard },
             { tab: "orders", label: locale === "ar" ? "الطلبات" : "Commandes", icon: ShoppingBag, count: orders.length },
             { tab: "abandoned", label: locale === "ar" ? "الطلبات المتروكة" : "Commandes abandonnées", icon: AlertTriangle, count: abandonedCheckouts.length + orders.filter((order) => isUndeliveredOrder(order.status)).length },
-            { tab: "products", label: locale === "ar" ? "المنتجات" : "Produits", icon: Package, count: products.length },
-            { tab: "products", label: locale === "ar" ? "تصميم المتجر" : "Design du magasin", icon: Palette, anchor: "homepage-editor" },
-            { tab: "products", label: locale === "ar" ? "إدارة المخزون" : "Stock", icon: Warehouse },
+            { tab: "products", label: locale === "ar" ? "المنتجات والمخزون" : "Produits & Stock", icon: Package, count: products.length },
+            { tab: "design", label: locale === "ar" ? "تصميم المتجر" : "Design du magasin", icon: Palette },
             { tab: "settings", label: locale === "ar" ? "الإعدادات" : "Paramètres", icon: Settings },
-          ] as const).map((item, index) => {
+          ] as const).map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.tab && (item.tab !== "products" || index === 3);
+            const isActive = activeTab === item.tab;
             return (
               <button
-                key={`${item.label}-${index}`}
+                key={item.tab}
                 type="button"
-                onClick={() => {
-                  setActiveTab(item.tab);
-                  if ("anchor" in item) {
-                    window.setTimeout(() => document.getElementById(item.anchor)?.scrollIntoView({ behavior: "smooth" }), 80);
-                  }
-                }}
+                onClick={() => setActiveTab(item.tab)}
                 className={cn(
                   "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-start transition",
                   isActive
@@ -259,6 +254,7 @@ export default function AdminPage() {
               { tab: "orders", label: locale === "ar" ? "الطلبات" : "Commandes", icon: ShoppingBag },
               { tab: "abandoned", label: locale === "ar" ? "المتروكة" : "Abandonnées", icon: AlertTriangle },
               { tab: "products", label: locale === "ar" ? "المنتجات" : "Produits", icon: Package },
+              { tab: "design", label: locale === "ar" ? "التصميم" : "Design", icon: Palette },
               { tab: "settings", label: locale === "ar" ? "الإعدادات" : "Paramètres", icon: Settings },
             ] as const).map((item) => {
               const Icon = item.icon;
@@ -289,17 +285,25 @@ export default function AdminPage() {
               : activeTab === "abandoned"
                 ? locale === "ar" ? "الطلبات المتروكة" : "Commandes abandonnées"
                 : activeTab === "products"
-                  ? locale === "ar" ? "إدارة المنتجات وتصميم المتجر" : "Produits et design du magasin"
-                  : activeTab === "settings"
-                    ? locale === "ar" ? "إعدادات المتجر" : "Paramètres du magasin"
-                    : locale === "ar" ? "الرئيسية والإحصائيات" : "Accueil et statistiques"}
+                  ? locale === "ar" ? "إدارة المنتجات والمخزون" : "Gestion des produits et stock"
+                  : activeTab === "design"
+                    ? locale === "ar" ? "تخصيص تصميم المتجر والفئات وصفحة الشكر" : "Design du magasin, catégories et page de remerciement"
+                    : activeTab === "settings"
+                      ? locale === "ar" ? "إعدادات المتجر" : "Paramètres du magasin"
+                      : locale === "ar" ? "الرئيسية والإحصائيات" : "Accueil et statistiques"}
           </h1>
           <p className="mt-1 text-xs text-zinc-400 sm:text-sm">
             {activeTab === "orders"
               ? locale === "ar" ? "مراقبة وإدارة طلبات الزبائن في متجرك" : "Suivez et gérez les commandes de votre boutique"
-              : activeTab === "products"
-                ? locale === "ar" ? "إدارة المنتجات والفئات والمخزون وتخصيص واجهة المتجر" : "Gérez les produits, catégories, stocks et contenu de la boutique"
-                : locale === "ar" ? "نظرة واضحة على نشاط المتجر وإعداداته" : "Vue d’ensemble de l’activité et des paramètres"}
+              : activeTab === "abandoned"
+                ? locale === "ar" ? "استرجاع ومتابعة الطلبات غير المكتملة" : "Suivi des paniers et commandes abandonnés"
+                : activeTab === "products"
+                  ? locale === "ar" ? "إدارة المنتجات، الأسعار، العروض الترويجية، ومراقبة المخزون" : "Gérez les produits, prix, réductions et stocks"
+                  : activeTab === "design"
+                    ? locale === "ar" ? "تعديل ألوان وشعار المتجر، إدارة الفئات وصورها، وتخصيص صفحة الشكر وسياسات الدفع والاستبدال" : "Personnalisez l'identité visuelle, les catégories avec photos, et la page de remerciement"
+                    : activeTab === "settings"
+                      ? locale === "ar" ? "إعدادات اللغة، بكسل الإعلانات، والشحن" : "Paramètres de langue, pixels publicitaires et livraison"
+                      : locale === "ar" ? "نظرة واضحة على نشاط المتجر وإحصائياته" : "Vue d’ensemble de l’activité et des statistiques"}
           </p>
         </div>
         {/* View Switcher based on Tab */}
@@ -366,6 +370,15 @@ export default function AdminPage() {
               onToggleActive={toggleProductActive}
             />
           </div>
+        )}
+
+        {activeTab === "design" && (
+          <AdminStoreDesign
+            products={products}
+            categories={categories}
+            onSaveCategory={upsertCategory}
+            onDeleteCategory={deleteCategory}
+          />
         )}
 
         {activeTab === "stats" && (

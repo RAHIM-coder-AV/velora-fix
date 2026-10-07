@@ -78,6 +78,33 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     storeName: "VELORA",
     storeTagline: "",
     logoUrl: "",
+    faviconUrl: "",
+    primaryColor: "#ababab",
+    secondaryColor: "#02d6f2",
+    announcements: {
+      announcement1: {
+        ar: "توصيل سريع ومضمون إلى 58 ولاية",
+        fr: "Livraison rapide et sécurisée dans 58 wilayas",
+      },
+      announcement2: {
+        ar: "الدفع عند الاستلام بعد معاينة طلبك",
+        fr: "Paiement à la livraison après inspection de votre colis",
+      },
+      announcement3: {
+        ar: "خدمة زبائن ومتابعة مخصصة طيلة أيام الأسبوع",
+        fr: "Service client et suivi personnalisé 7j/7",
+      },
+    },
+    policies: {
+      payment: {
+        ar: "الدفع نقداً عند استلام طلبيتك بعد التحقق من المنتجات.",
+        fr: "Paiement en espèces à la réception de votre commande après vérification.",
+      },
+      exchange: {
+        ar: "إمكانية الاستبدال أو الإرجاع خلال 48 ساعة في حال وجود أي عيب مصنعي.",
+        fr: "Possibilité d'échange ou de retour sous 48h en cas de défaut de fabrication.",
+      },
+    },
     checkout: {
       showEmail: false,
       showNotes: true,
@@ -95,12 +122,20 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     },
     thankYou: {
       title: {
-        ar: "شكراً لطلبك",
-        fr: "Merci pour votre commande",
+        ar: "شُكراً جزيلاً على ثقتكم",
+        fr: "Merci beaucoup pour votre confiance",
+      },
+      highlightBanner: {
+        ar: "تم استلام الطلب بنجاح! سيصل طلبك بعد 24 أو 48 ساعة على الأكثر",
+        fr: "Commande reçue avec succès ! Livraison sous 24 à 48h maximum",
       },
       body: {
-        ar: "تم استلام طلبك رقم {ref}. سنتصل بك قريباً لتأكيده.",
-        fr: "Votre commande {ref} a bien été reçue. Nous vous contacterons bientôt pour la confirmer.",
+        ar: "نحن نقدر تفضيلك لمنتجاتنا ونحن سعداء لإعلامك أن طلبك رقم {ref} قد تم استلامه بنجاح. الآن هناك خطوة أخيرة لضمان تأكيد طلبك بشكل كامل.",
+        fr: "Nous apprécions votre commande {ref} reçue avec succès. Notre équipe vous contactera sous peu pour confirmation.",
+      },
+      importantNote: {
+        ar: "ملاحظة مهمة: يرجى الاطلاع على الإشعار في الأسفل لتأكيد طلبك (لن يتم إرسال الطلب بدون تأكيده)",
+        fr: "Note importante : Veuillez répondre à notre appel ou SMS pour valider l'envoi de votre colis.",
       },
       buttonLabel: {
         ar: "العودة إلى المتجر",

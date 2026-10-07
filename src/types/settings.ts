@@ -35,6 +35,18 @@ export interface StorefrontConfiguration {
   storeName: string;
   storeTagline: string;
   logoUrl: string;
+  faviconUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  announcements?: {
+    announcement1: { ar: string; fr: string };
+    announcement2: { ar: string; fr: string };
+    announcement3: { ar: string; fr: string };
+  };
+  policies?: {
+    payment: { ar: string; fr: string };
+    exchange: { ar: string; fr: string };
+  };
   checkout: {
     showEmail: boolean;
     showNotes: boolean;
@@ -46,7 +58,9 @@ export interface StorefrontConfiguration {
   };
   thankYou: {
     title: { ar: string; fr: string };
+    highlightBanner?: { ar: string; fr: string };
     body: { ar: string; fr: string };
+    importantNote?: { ar: string; fr: string };
     buttonLabel: { ar: string; fr: string };
   };
 }
