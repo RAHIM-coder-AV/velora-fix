@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { SharedStoreSettings, StoreSettings, WilayaDeliveryPrice } from "@/types/settings";
+import type { ProductShippingConfig } from "@/types";
 import { DEFAULT_STORE_SETTINGS } from "@/lib/default-settings";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
@@ -21,7 +22,11 @@ interface SettingsState {
   refreshPixels: () => Promise<void>;
   refreshSharedSettings: () => Promise<void>;
   saveSharedSettings: () => Promise<void>;
-  getShippingFee: (wilayaValue: string, deliveryType: "home" | "desk") => number;
+  getShippingFee: (
+    wilayaValue: string,
+    deliveryType: "home" | "desk",
+    productShipping?: ProductShippingConfig | null
+  ) => number;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -139,8 +144,39 @@ export const useSettingsStore = create<SettingsState>()(
         await db.saveSharedStoreSettings(client, shared);
       },
 
-      getShippingFee: (wilayaValue: string, deliveryType: "home" | "desk") => {
+      getShippingFee: (
+        wilayaValue: string,
+        deliveryType: "home" | "desk",
+        productShipping?: ProductShippingConfig | null
+      ) => {
         const { settings } = get();
+
+        // 1. Product-level shipping configuration
+        if (productShipping) {
+          if (productShipping.type === "free") return 0;
+          if (productShipping.type === "fixed") {
+            const fixedHome = productShipping.fixedHomePrice ?? settings.defaultHomePrice;
+            const fixedDesk = productShipping.fixedDeskPrice ?? settings.defaultDeskPrice;
+            return deliveryType === "home" ? fixedHome : fixedDesk;
+          }
+          if (productShipping.type === "custom" && productShipping.wilayaPrices) {
+            const matchedKey = Object.keys(settings.wilayaPrices).find((code) => {
+              const w = settings.wilayaPrices[code];
+              return (
+                wilayaValue.includes(w.code) ||
+                wilayaValue.includes(w.nameAr) ||
+                wilayaValue.toLowerCase().includes(w.nameFr.toLowerCase())
+              );
+            });
+            if (matchedKey && productShipping.wilayaPrices[matchedKey]) {
+              const customW = productShipping.wilayaPrices[matchedKey];
+              const price = deliveryType === "home" ? customW.home : customW.desk;
+              if (price !== undefined) return price;
+            }
+          }
+        }
+
+        // 2. Store-wide shipping configuration
         if (settings.shippingType === "free") return 0;
         if (settings.shippingType === "fixed") {
           return deliveryType === "home" ? settings.defaultHomePrice : settings.defaultDeskPrice;

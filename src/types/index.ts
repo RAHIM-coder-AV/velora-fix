@@ -66,6 +66,15 @@ export interface Review {
   createdAt: string;
 }
 
+export type ProductShippingType = "store" | "fixed" | "custom" | "free";
+
+export interface ProductShippingConfig {
+  type: ProductShippingType;
+  fixedHomePrice?: number;
+  fixedDeskPrice?: number;
+  wilayaPrices?: Record<string, { home?: number; desk?: number }>;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -80,6 +89,7 @@ export interface Product {
   sizes: string[];
   colors: { name: Localized; hex: string }[];
   offers?: ProductOffer[];
+  shippingConfig?: ProductShippingConfig;
   active?: boolean;
   views?: number;
   featured: boolean;

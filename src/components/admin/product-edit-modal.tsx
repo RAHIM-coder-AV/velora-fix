@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { X, Plus, Trash2, Check, Upload, Tag, DollarSign, Image as ImageIcon, Layers, Palette } from "lucide-react";
+import { X, Plus, Trash2, Check, Upload, Tag, DollarSign, Image as ImageIcon, Layers, Palette, Truck } from "lucide-react";
 import type { Product, ProductOffer, Category } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
 import { uid } from "@/lib/utils";
@@ -26,11 +26,16 @@ export function ProductEditModal({
   onSave,
 }: ProductEditModalProps) {
   const { locale } = useLocale();
-  const [activeTab, setActiveTab] = useState<"general" | "options" | "offers" | "images">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "options" | "offers" | "images" | "shipping">("general");
 
   // Local form state
   const [formData, setFormData] = useState<Product>({
     ...product,
+    shippingConfig: product.shippingConfig || {
+      type: "store",
+      fixedHomePrice: 0,
+      fixedDeskPrice: 0,
+    },
     variants: reconcileProductVariants(product.variants, product.sizes, product.colors),
     offers: product.offers || [
       {
@@ -328,6 +333,20 @@ export function ProductEditModal({
           >
             <Palette size={15} />
             {locale === "ar" ? "الألوان والمقاسات" : "Couleurs & tailles"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("shipping")}
+            className={cn(
+              "flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold uppercase tracking-wider transition",
+              activeTab === "shipping"
+                ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
+                : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400"
+            )}
+          >
+            <Truck size={15} />
+            {locale === "ar" ? "أسعار التوصيل" : "Frais de livraison"}
           </button>
         </div>
 
@@ -827,6 +846,244 @@ export function ProductEditModal({
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: Shipping Prices */}
+          {activeTab === "shipping" && (
+            <div className="space-y-6">
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-5 dark:border-zinc-800 dark:bg-zinc-800/30">
+                <div className="mb-4 flex items-center gap-2 border-b border-zinc-200 pb-3 dark:border-zinc-800">
+                  <Truck className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                    {locale === "ar" ? "تسعير الولايات وتكاليف التوصيل" : "Tarification de livraison"}
+                  </h3>
+                </div>
+
+                <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
+                  {locale === "ar"
+                    ? "اختر كيفية حساب تكلفة التوصيل لهذا المنتج عند طلب الزبون:"
+                    : "Choisissez le mode de calcul des frais de livraison pour ce produit :"}
+                </p>
+
+                <div className="space-y-3">
+                  {/* Option 1: Store Price */}
+                  <label
+                    onClick={() =>
+                      setFormData((p) => ({
+                        ...p,
+                        shippingConfig: { ...(p.shippingConfig || { type: "store" }), type: "store" },
+                      }))
+                    }
+                    className={cn(
+                      "flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition",
+                      (formData.shippingConfig?.type || "store") === "store"
+                        ? "border-purple-600 bg-purple-50/40 ring-1 ring-purple-600/30 dark:border-purple-500 dark:bg-purple-950/20"
+                        : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="shippingType"
+                      checked={(formData.shippingConfig?.type || "store") === "store"}
+                      onChange={() =>
+                        setFormData((p) => ({
+                          ...p,
+                          shippingConfig: { ...(p.shippingConfig || { type: "store" }), type: "store" },
+                        }))
+                      }
+                      className="mt-0.5 h-4 w-4 text-purple-600 focus:ring-purple-500"
+                    />
+                    <div className="flex-1">
+                      <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                        {locale === "ar" ? "استخدام سعر المتجر للتوصيل" : "Utiliser les tarifs généraux de la boutique"}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                        {locale === "ar"
+                          ? "تطبيق أسعار التوصيل المحددة في الإعدادات العامة للمتجر حسب كل ولاية."
+                          : "Appliquer les tarifs configurés dans les paramètres généraux du magasin."}
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* Option 2: Fixed Price */}
+                  <div
+                    className={cn(
+                      "rounded-xl border p-4 transition",
+                      formData.shippingConfig?.type === "fixed"
+                        ? "border-purple-600 bg-purple-50/40 ring-1 ring-purple-600/30 dark:border-purple-500 dark:bg-purple-950/20"
+                        : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800"
+                    )}
+                  >
+                    <label
+                      onClick={() =>
+                        setFormData((p) => ({
+                          ...p,
+                          shippingConfig: { ...(p.shippingConfig || { type: "fixed" }), type: "fixed" },
+                        }))
+                      }
+                      className="flex cursor-pointer items-start gap-3"
+                    >
+                      <input
+                        type="radio"
+                        name="shippingType"
+                        checked={formData.shippingConfig?.type === "fixed"}
+                        onChange={() =>
+                          setFormData((p) => ({
+                            ...p,
+                            shippingConfig: { ...(p.shippingConfig || { type: "fixed" }), type: "fixed" },
+                          }))
+                        }
+                        className="mt-0.5 h-4 w-4 text-purple-600 focus:ring-purple-500"
+                      />
+                      <div className="flex-1">
+                        <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                          {locale === "ar"
+                            ? "تحديد سعر توصيل ثابت لكل الولايات"
+                            : "Tarif de livraison fixe pour toutes les wilayas"}
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                          {locale === "ar"
+                            ? "تحديد سعر موحد للتوصيل للمنزل وللمكتب ينطبق على كافة الولايات لهذا المنتج."
+                            : "Définir un prix fixe pour la livraison à domicile et en bureau pour ce produit."}
+                        </div>
+                      </div>
+                    </label>
+
+                    {formData.shippingConfig?.type === "fixed" && (
+                      <div className="mt-4 grid gap-4 border-t border-purple-200/60 pt-4 sm:grid-cols-2 dark:border-purple-900/40">
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                            {locale === "ar" ? "سعر التوصيل للمنزل (د.ج)" : "Prix livraison domicile (DZD)"}
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="600"
+                            value={formData.shippingConfig?.fixedHomePrice ?? ""}
+                            onChange={(e) =>
+                              setFormData((p) => ({
+                                ...p,
+                                shippingConfig: {
+                                  ...(p.shippingConfig || { type: "fixed" }),
+                                  type: "fixed",
+                                  fixedHomePrice: Number(e.target.value) || 0,
+                                },
+                              }))
+                            }
+                            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                            {locale === "ar" ? "سعر التوصيل للمكتب / نقطة الاستلام (د.ج)" : "Prix livraison bureau (DZD)"}
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="400"
+                            value={formData.shippingConfig?.fixedDeskPrice ?? ""}
+                            onChange={(e) =>
+                              setFormData((p) => ({
+                                ...p,
+                                shippingConfig: {
+                                  ...(p.shippingConfig || { type: "fixed" }),
+                                  type: "fixed",
+                                  fixedDeskPrice: Number(e.target.value) || 0,
+                                },
+                              }))
+                            }
+                            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Option 3: Custom / Default per wilaya */}
+                  <label
+                    onClick={() =>
+                      setFormData((p) => ({
+                        ...p,
+                        shippingConfig: { ...(p.shippingConfig || { type: "custom" }), type: "custom" },
+                      }))
+                    }
+                    className={cn(
+                      "flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition",
+                      formData.shippingConfig?.type === "custom"
+                        ? "border-purple-600 bg-purple-50/40 ring-1 ring-purple-600/30 dark:border-purple-500 dark:bg-purple-950/20"
+                        : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="shippingType"
+                      checked={formData.shippingConfig?.type === "custom"}
+                      onChange={() =>
+                        setFormData((p) => ({
+                          ...p,
+                          shippingConfig: { ...(p.shippingConfig || { type: "custom" }), type: "custom" },
+                        }))
+                      }
+                      className="mt-0.5 h-4 w-4 text-purple-600 focus:ring-purple-500"
+                    />
+                    <div className="flex-1">
+                      <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                        {locale === "ar" ? "السعر الافتراضي لكل ولاية" : "Tarif par défaut pour chaque wilaya"}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                        {locale === "ar"
+                          ? "استخدام تسعير كل ولاية الفردي المعتمد في المتجر."
+                          : "Utiliser la tarification par défaut de chaque wilaya."}
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* Option 4: Free Shipping */}
+                  <label
+                    onClick={() =>
+                      setFormData((p) => ({
+                        ...p,
+                        shippingConfig: { ...(p.shippingConfig || { type: "free" }), type: "free" },
+                      }))
+                    }
+                    className={cn(
+                      "flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition",
+                      formData.shippingConfig?.type === "free"
+                        ? "border-purple-600 bg-purple-50/40 ring-1 ring-purple-600/30 dark:border-purple-500 dark:bg-purple-950/20"
+                        : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="shippingType"
+                      checked={formData.shippingConfig?.type === "free"}
+                      onChange={() =>
+                        setFormData((p) => ({
+                          ...p,
+                          shippingConfig: { ...(p.shippingConfig || { type: "free" }), type: "free" },
+                        }))
+                      }
+                      className="mt-0.5 h-4 w-4 text-purple-600 focus:ring-purple-500"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                          {locale === "ar" ? "التوصيل مجاني" : "Livraison gratuite"}
+                        </span>
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          0 DZD
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                        {locale === "ar"
+                          ? "توصيل مجاني 0 د.ج لجميع الولايات والزبائن لهذا المنتج."
+                          : "Livraison 100% offerte (0 DZD) pour toutes les wilayas pour ce produit."}
+                      </div>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
           )}

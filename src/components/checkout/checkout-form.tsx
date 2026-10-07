@@ -73,7 +73,13 @@ export function CheckoutForm() {
   const freeThreshold = useSettingsStore((s) => s.settings.freeShippingThreshold);
 
   const subtotal = lines.reduce((s, l) => s + l.product.price * l.item.quantity, 0);
-  const shippingFee = subtotal >= freeThreshold || subtotal === 0 ? 0 : getShippingFee(form.wilaya, "home");
+  const singleProductShipping =
+    lines.length === 1
+      ? lines[0].product.shippingConfig
+      : lines.length > 0 && lines.every((l) => l.product.shippingConfig?.type === "free")
+      ? { type: "free" as const }
+      : null;
+  const shippingFee = subtotal >= freeThreshold || subtotal === 0 ? 0 : getShippingFee(form.wilaya, "home", singleProductShipping);
   const totals = {
     subtotal,
     shipping: shippingFee,

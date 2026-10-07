@@ -101,7 +101,10 @@ export function QuickOrderForm({
   const getShippingFee = useSettingsStore((s) => s.getShippingFee);
   const storefront = useSettingsStore((s) => s.settings.storefront);
   const refreshSharedSettings = useSettingsStore((s) => s.refreshSharedSettings);
-  const shippingFee = useMemo(() => getShippingFee(wilaya, deliveryType), [getShippingFee, wilaya, deliveryType]);
+  const shippingFee = useMemo(
+    () => getShippingFee(wilaya, deliveryType, product.shippingConfig),
+    [getShippingFee, wilaya, deliveryType, product.shippingConfig]
+  );
 
   useEffect(() => {
     void refreshSharedSettings().catch((error) => console.error("Failed to load product form settings", error));
