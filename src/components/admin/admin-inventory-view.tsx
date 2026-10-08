@@ -915,33 +915,39 @@ function ProductRow({
         {/* Total Stock Quantity with Badge */}
         {visibleColumns.quantity && (
           <td className="py-3 px-4">
-            <div className="flex items-center gap-2">
-              <span
-                className={cn(
-                  "font-bold text-sm",
-                  isOutOfStock
-                    ? "text-red-400"
-                    : isLowStock
-                    ? "text-amber-400"
-                    : "text-zinc-100"
-                )}
-              >
-                {stock}
+            {product.trackStock === false ? (
+              <span className="rounded-md bg-blue-950/60 border border-blue-700/60 px-2 py-0.5 text-[10px] font-bold text-blue-300">
+                {locale === "ar" ? "غير محدود (بدون تتبع)" : "Illimité (sans suivi)"}
               </span>
-              {isOutOfStock ? (
-                <span className="rounded-md bg-red-950/70 border border-red-800/80 px-2 py-0.5 text-[10px] font-bold text-red-300">
-                  {locale === "ar" ? "نفد" : "Épuisé"}
+            ) : (
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    "font-bold text-sm",
+                    isOutOfStock
+                      ? "text-red-400"
+                      : isLowStock
+                      ? "text-amber-400"
+                      : "text-zinc-100"
+                  )}
+                >
+                  {stock}
                 </span>
-              ) : isLowStock ? (
-                <span className="rounded-md bg-amber-950/70 border border-amber-800/80 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-                  {locale === "ar" ? "منخفض" : "Faible"}
-                </span>
-              ) : (
-                <span className="rounded-md bg-emerald-950/40 border border-emerald-800/50 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
-                  {locale === "ar" ? "متوفر" : "En stock"}
-                </span>
-              )}
-            </div>
+                {isOutOfStock ? (
+                  <span className="rounded-md bg-red-950/70 border border-red-800/80 px-2 py-0.5 text-[10px] font-bold text-red-300">
+                    {locale === "ar" ? "نفد" : "Épuisé"}
+                  </span>
+                ) : isLowStock ? (
+                  <span className="rounded-md bg-amber-950/70 border border-amber-800/80 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+                    {locale === "ar" ? "منخفض" : "Faible"}
+                  </span>
+                ) : (
+                  <span className="rounded-md bg-emerald-950/40 border border-emerald-800/50 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                    {locale === "ar" ? "متوفر" : "En stock"}
+                  </span>
+                )}
+              </div>
+            )}
           </td>
         )}
 

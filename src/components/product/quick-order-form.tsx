@@ -122,16 +122,18 @@ export function QuickOrderForm({
     router.prefetch(`/${locale}/checkout/success`);
   }, [refreshSharedSettings, router, locale]);
 
-  // Out-of-stock detection: only show sizes and colors that have stock > 0
+  // Out-of-stock detection: only show sizes and colors that have stock > 0 (if trackStock is not disabled)
   const availableSizes = useMemo(() => {
+    if (product.trackStock === false) return product.sizes;
     if (!product.variants || product.variants.length === 0) return product.sizes;
     const inStock = product.sizes.filter((s) =>
       product.variants.some((v) => v.size === s && v.stock > 0)
     );
     return inStock.length > 0 ? inStock : product.sizes;
-  }, [product.sizes, product.variants]);
+  }, [product.sizes, product.variants, product.trackStock]);
 
   const availableColors = useMemo(() => {
+    if (product.trackStock === false) return product.colors;
     if (!product.variants || product.variants.length === 0) return product.colors;
     const inStockForSize = product.colors.filter((c) =>
       product.variants.some(
@@ -149,12 +151,13 @@ export function QuickOrderForm({
       )
     );
     return inStockAny.length > 0 ? inStockAny : product.colors;
-  }, [product.colors, product.variants, selectedSize]);
+  }, [product.colors, product.variants, selectedSize, product.trackStock]);
 
   const isCompletelyOutOfStock = useMemo(() => {
+    if (product.trackStock === false) return false;
     if (!product.variants || product.variants.length === 0) return false;
     return product.variants.every((v) => v.stock <= 0);
-  }, [product.variants]);
+  }, [product.variants, product.trackStock]);
 
   // Dynamic communes list based on selected wilaya
   const communes = useMemo(() => getCommunesForWilaya(wilaya), [wilaya]);

@@ -376,18 +376,24 @@ export function AdminProductsTable({
 
                     {/* Stock */}
                     <td className="py-3.5 px-3">
-                      <span
-                        className={cn(
-                          "rounded-md px-2 py-0.5 font-bold",
-                          stock > 5
-                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
-                            : stock > 0
-                            ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
-                            : "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400"
-                        )}
-                      >
-                        {stock}
-                      </span>
+                      {p.trackStock === false ? (
+                        <span className="rounded-md bg-blue-50 px-2 py-0.5 font-bold text-blue-700 dark:bg-blue-950/40 dark:text-blue-400">
+                          {locale === "ar" ? "غير محدود" : "Illimité"}
+                        </span>
+                      ) : (
+                        <span
+                          className={cn(
+                            "rounded-md px-2 py-0.5 font-bold",
+                            stock > 5
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                              : stock > 0
+                              ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                              : "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400"
+                          )}
+                        >
+                          {stock}
+                        </span>
+                      )}
                     </td>
 
                     {/* Price & CompareAtPrice */}

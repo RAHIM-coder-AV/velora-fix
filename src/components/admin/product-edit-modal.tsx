@@ -31,6 +31,7 @@ export function ProductEditModal({
   // Local form state
   const [formData, setFormData] = useState<Product>({
     ...product,
+    trackStock: product.trackStock !== undefined ? product.trackStock : true,
     shippingConfig: product.shippingConfig || {
       type: "store",
       fixedHomePrice: 0,
@@ -491,6 +492,55 @@ export function ProductEditModal({
 
           {activeTab === "options" && (
             <div className="space-y-6">
+              {/* Inventory Tracking Toggle (هل أعمل بنظام المخزون أم لا) */}
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/50">
+                <div className="flex items-start gap-3">
+                  <div className={cn(
+                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-bold text-white transition shadow-sm",
+                    (formData.trackStock ?? true) ? "bg-emerald-600" : "bg-zinc-500"
+                  )}>
+                    <Layers size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                        {locale === "ar" ? "نظام تتبع وإدارة المخزون" : "Gestion et suivi du stock"}
+                      </h3>
+                      <span className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                        (formData.trackStock ?? true)
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                          : "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400"
+                      )}>
+                        {(formData.trackStock ?? true)
+                          ? (locale === "ar" ? "مفعّل (حسب الكميات)" : "Activé")
+                          : (locale === "ar" ? "معطّل (مخزون غير محدود)" : "Stock illimité")}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                      {(formData.trackStock ?? true)
+                        ? (locale === "ar"
+                            ? "يتم تتبع كميات كل مقاس ولون بدقة، وإخفاء الخيارات التي ينفد مخزونها (0) تلقائياً من الزبائن."
+                            : "Le stock de chaque taille et couleur est contrôlé. Les variantes épuisées sont masquées.")
+                        : (locale === "ar"
+                            ? "المنتج متوفر دائماً للطلب بدون قيود على المخزون (لن يتم إخفاء أي مقاس أو لون عند نفاذ الكمية)."
+                            : "Le produit est toujours disponible sans limite de quantité pour les clients.")
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                <label className="relative inline-flex cursor-pointer items-center shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={formData.trackStock ?? true}
+                    onChange={(e) => setFormData((p) => ({ ...p, trackStock: e.target.checked }))}
+                    className="peer sr-only"
+                  />
+                  <div className="peer h-6 w-11 rounded-full bg-zinc-300 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-zinc-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-600 peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-zinc-700 rtl:peer-checked:after:-translate-x-full"></div>
+                </label>
+              </div>
+
               <div>
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
@@ -622,7 +672,23 @@ export function ProductEditModal({
                     {locale === "ar" ? "تُحفظ تركيبات المقاس واللون كخيارات مستقلة. يبدأ المخزون لأي تركيبة جديدة من صفر." : "Chaque combinaison est enregistrée séparément. Le stock des nouvelles combinaisons commence à zéro."}
                   </p>
                 </div>
-                {formData.variants.length > 0 ? (
+
+                {!(formData.trackStock ?? true) ? (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-center dark:border-blue-900/40 dark:bg-blue-950/20">
+                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">
+                      {locale === "ar"
+                        ? "✨ نظام تتبع المخزون معطّل لهذا المنتج — جميع المقاسات والألوان المضافة أعلاه متاحة للطلب غير المحدود."
+                        : "✨ Suivi de stock désactivé — toutes les tailles et couleurs sont commandables en quantité illimitée."}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setFormData((p) => ({ ...p, trackStock: true }))}
+                      className="mt-2 text-xs font-bold text-blue-700 underline hover:text-blue-900 dark:text-blue-400"
+                    >
+                      {locale === "ar" ? "تفعيل تتبع كميات المخزون الآن" : "Activer la gestion par quantité"}
+                    </button>
+                  </div>
+                ) : formData.variants.length > 0 ? (
                   <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
                     <table className="w-full text-right text-xs">
                       <thead className="bg-zinc-50 text-zinc-500 dark:bg-zinc-800">

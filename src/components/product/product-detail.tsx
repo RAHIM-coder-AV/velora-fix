@@ -29,8 +29,9 @@ export function ProductDetail({
   const { locale, dict } = useLocale();
   const [image, setImage] = useState(0);
 
-  // Available sizes with stock > 0
+  // Available sizes (if tracking stock is enabled, only show stock > 0)
   const availableSizes = (() => {
+    if (product.trackStock === false) return product.sizes;
     if (!product.variants || product.variants.length === 0) return product.sizes;
     const inStock = product.sizes.filter((s) =>
       product.variants.some((v) => v.size === s && v.stock > 0)
@@ -40,8 +41,9 @@ export function ProductDetail({
 
   const initialSize = availableSizes[0] || product.sizes[0] || "M";
 
-  // Available colors for the size with stock > 0
+  // Available colors for the size
   const getAvailableColorsForSize = (targetSize: string) => {
+    if (product.trackStock === false) return product.colors;
     if (!product.variants || product.variants.length === 0) return product.colors;
     const inStock = product.colors.filter((c) =>
       product.variants.some(
@@ -81,7 +83,7 @@ export function ProductDetail({
   const variant = findVariant(product, size, color);
 
   function add() {
-    if (!variant || variant.stock < 1) {
+    if (!variant || (product.trackStock !== false && variant.stock < 1)) {
       toast(dict.product.selectVariant);
       return;
     }

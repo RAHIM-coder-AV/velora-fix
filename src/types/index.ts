@@ -90,6 +90,7 @@ export interface Product {
   colors: { name: Localized; hex: string }[];
   offers?: ProductOffer[];
   shippingConfig?: ProductShippingConfig;
+  trackStock?: boolean;
   active?: boolean;
   views?: number;
   featured: boolean;
