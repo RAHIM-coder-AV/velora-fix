@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, Fragment } from "react";
 import Image from "next/image";
 import {
   Phone,
@@ -897,7 +897,7 @@ export function AdminOrdersTable({
                 const phoneClean = o.phone.replace(/[\s\-_]/g, "");
 
                 return (
-                  <tr key={o.id} className="contents">
+                  <Fragment key={o.id}>
                     {/* Main Row */}
                     <tr
                       className={cn(
@@ -1224,7 +1224,7 @@ export function AdminOrdersTable({
                         </td>
                       </tr>
                     )}
-                  </tr>
+                  </Fragment>
                 );
               })
             )}
