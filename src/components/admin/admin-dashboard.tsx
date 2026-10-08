@@ -48,9 +48,11 @@ function TrendChart({
   // Round max up to nice multiple of 6 for clear grid lines
   const peak = Math.max(12, Math.ceil(rawMax / 6) * 6);
 
+  const round = (val: number) => Number(val.toFixed(2));
+
   const pointAt = (value: number, index: number) => ({
-    x: left + (days.length <= 1 ? plotWidth / 2 : (index * plotWidth) / (days.length - 1)),
-    y: top + plotHeight - (value / peak) * plotHeight,
+    x: round(left + (days.length <= 1 ? plotWidth / 2 : (index * plotWidth) / (days.length - 1))),
+    y: round(top + plotHeight - (value / peak) * plotHeight),
   });
 
   const orderPoints = days.map((day, index) => pointAt(day.orders, index));
@@ -64,10 +66,10 @@ function TrendChart({
       const p1 = points[i];
       const p2 = points[i + 1];
       const p3 = points[i + 2] || p2;
-      const cp1x = p1.x + (p2.x - p0.x) / 6;
-      const cp1y = p1.y + (p2.y - p0.y) / 6;
-      const cp2x = p2.x - (p3.x - p1.x) / 6;
-      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      const cp1x = round(p1.x + (p2.x - p0.x) / 6);
+      const cp1y = round(p1.y + (p2.y - p0.y) / 6);
+      const cp2x = round(p2.x - (p3.x - p1.x) / 6);
+      const cp2y = round(p2.y - (p3.y - p1.y) / 6);
       d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
     }
     return d;
@@ -90,6 +92,7 @@ function TrendChart({
           className="h-auto min-w-[580px] w-full overflow-visible"
           role="img"
           aria-label={locale === "ar" ? "تحليل ومخطط الطلبات" : "Graphique des commandes"}
+          suppressHydrationWarning
         >
           {/* Horizontal grid lines & Y-axis labels on the right */}
           {Array.from({ length: yStepCount + 1 }).map((_, line) => {
@@ -653,24 +656,25 @@ export function AdminDashboard({
           </div>
           <div className="mt-4 flex flex-col items-center">
             <div className="relative flex h-48 w-48 items-center justify-center">
-              <svg className="h-48 w-48" viewBox="0 0 100 100">
+              <svg className="h-48 w-48" viewBox="0 0 100 100" suppressHydrationWarning>
                 {(() => {
                   const values = donutPlatforms.map((p) => p.defaultWeight);
                   const sum = values.reduce((s, v) => s + v, 0);
                   let startAngle = -Math.PI / 2;
-                  return donutPlatforms.map((platform, segIndex) => {
+                  const round = (n: number) => Number(n.toFixed(2));
+                  return donutPlatforms.map((platform) => {
                     const weight = platform.defaultWeight;
                     const angle = (weight / sum) * Math.PI * 2;
                     const endAngle = startAngle + angle;
                     const largeArc = angle > Math.PI ? 1 : 0;
-                    const x1 = 50 + 38 * Math.cos(startAngle);
-                    const y1 = 50 + 38 * Math.sin(startAngle);
-                    const x2 = 50 + 38 * Math.cos(endAngle);
-                    const y2 = 50 + 38 * Math.sin(endAngle);
-                    const ix1 = 50 + 24 * Math.cos(endAngle);
-                    const iy1 = 50 + 24 * Math.sin(endAngle);
-                    const ix2 = 50 + 24 * Math.cos(startAngle);
-                    const iy2 = 50 + 24 * Math.sin(startAngle);
+                    const x1 = round(50 + 38 * Math.cos(startAngle));
+                    const y1 = round(50 + 38 * Math.sin(startAngle));
+                    const x2 = round(50 + 38 * Math.cos(endAngle));
+                    const y2 = round(50 + 38 * Math.sin(endAngle));
+                    const ix1 = round(50 + 24 * Math.cos(endAngle));
+                    const iy1 = round(50 + 24 * Math.sin(endAngle));
+                    const ix2 = round(50 + 24 * Math.cos(startAngle));
+                    const iy2 = round(50 + 24 * Math.sin(startAngle));
                     startAngle = endAngle;
                     return (
                       <path
@@ -679,6 +683,7 @@ export function AdminDashboard({
                         fill={platform.color}
                         stroke={platform.stroke || "#181920"}
                         strokeWidth="1.5"
+                        suppressHydrationWarning
                       />
                     );
                   });

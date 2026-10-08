@@ -17,7 +17,6 @@ import {
   ChevronDown,
   User,
   Trash2,
-  Crown,
   RefreshCw,
   Sparkles,
 } from "lucide-react";
@@ -317,37 +316,10 @@ export default function AdminPage() {
                           </span>
                         </div>
                         <p className="mt-0.5 truncate text-xs text-zinc-400">{user?.email || "azrtefsgy@gmail.com"}</p>
-                        
-                        <div className="mt-2.5 flex items-center justify-between border-t border-zinc-800/80 pt-2 text-[11px] text-zinc-400">
-                          <span className="flex items-center gap-1 text-emerald-400">
-                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                            {locale === "ar" ? "تاريخ الانتهاء: 11 أيام" : "Expire dans: 11 jours"}
-                          </span>
-                          <Link
-                            href={`/${locale}`}
-                            target="_blank"
-                            onClick={() => setProfileMenuOpen(false)}
-                            className="text-purple-300 hover:text-purple-200 font-semibold underline underline-offset-2"
-                          >
-                            {locale === "ar" ? "عرض المتجر" : "Voir"}
-                          </Link>
-                        </div>
                       </div>
 
                       {/* Menu List */}
                       <div className="mt-2 space-y-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setProfileMenuOpen(false);
-                            toast(locale === "ar" ? "الاشتراك نشط ومفعل" : "Abonnement actif");
-                          }}
-                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800/80 hover:text-white"
-                        >
-                          <Crown size={15} className="text-amber-400" />
-                          <span>{locale === "ar" ? "إدارة الاشتراك" : "Gestion de l'abonnement"}</span>
-                        </button>
-
                         <button
                           type="button"
                           onClick={() => {

@@ -100,7 +100,10 @@ export function QuickOrderForm({
 
   const getShippingFee = useSettingsStore((s) => s.getShippingFee);
   const storefront = useSettingsStore((s) => s.settings.storefront);
+  const fraudProtection = useSettingsStore((s) => s.settings.fraudProtection);
   const refreshSharedSettings = useSettingsStore((s) => s.refreshSharedSettings);
+  const [clientIp, setClientIp] = useState<string>("154.121.96.148");
+
   const shippingFee = useMemo(
     () => getShippingFee(wilaya, deliveryType, product.shippingConfig),
     [getShippingFee, wilaya, deliveryType, product.shippingConfig]
@@ -108,10 +111,68 @@ export function QuickOrderForm({
 
   useEffect(() => {
     void refreshSharedSettings().catch((error) => console.error("Failed to load product form settings", error));
-  }, [refreshSharedSettings]);
+    // Resolve client IP
+    fetch("/api/ip")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.ip) setClientIp(data.ip);
+      })
+      .catch(() => {});
+    // Prefetch thank-you page for instant redirection
+    router.prefetch(`/${locale}/checkout/success`);
+  }, [refreshSharedSettings, router, locale]);
+
+  // Out-of-stock detection: only show sizes and colors that have stock > 0
+  const availableSizes = useMemo(() => {
+    if (!product.variants || product.variants.length === 0) return product.sizes;
+    const inStock = product.sizes.filter((s) =>
+      product.variants.some((v) => v.size === s && v.stock > 0)
+    );
+    return inStock.length > 0 ? inStock : product.sizes;
+  }, [product.sizes, product.variants]);
+
+  const availableColors = useMemo(() => {
+    if (!product.variants || product.variants.length === 0) return product.colors;
+    const inStockForSize = product.colors.filter((c) =>
+      product.variants.some(
+        (v) =>
+          v.size === selectedSize &&
+          v.colorHex.toLowerCase() === c.hex.toLowerCase() &&
+          v.stock > 0
+      )
+    );
+    if (inStockForSize.length > 0) return inStockForSize;
+
+    const inStockAny = product.colors.filter((c) =>
+      product.variants.some(
+        (v) => v.colorHex.toLowerCase() === c.hex.toLowerCase() && v.stock > 0
+      )
+    );
+    return inStockAny.length > 0 ? inStockAny : product.colors;
+  }, [product.colors, product.variants, selectedSize]);
+
+  const isCompletelyOutOfStock = useMemo(() => {
+    if (!product.variants || product.variants.length === 0) return false;
+    return product.variants.every((v) => v.stock <= 0);
+  }, [product.variants]);
 
   // Dynamic communes list based on selected wilaya
   const communes = useMemo(() => getCommunesForWilaya(wilaya), [wilaya]);
+
+  // Button disable mode configured from admin settings
+  const isButtonDisabled = useMemo(() => {
+    if (submitting) return true;
+    const mode = storefront?.productForm?.buttonDisableMode || "never";
+    if (mode === "out_of_stock") {
+      return isCompletelyOutOfStock;
+    }
+    if (mode === "invalid_fields") {
+      const isNameValid = !storefront?.productForm?.nameRequired || customerName.trim().length > 0;
+      const isPhoneValid = !storefront?.productForm?.phoneRequired || isAlgerianPhone(phone);
+      return !isNameValid || !isPhoneValid || !wilaya;
+    }
+    return false; // "never"
+  }, [submitting, storefront?.productForm, isCompletelyOutOfStock, customerName, phone, wilaya]);
 
   const currentPrice = selectedOffer ? selectedOffer.price : product.price;
   const selectedVariant = product.variants.find(
@@ -173,10 +234,55 @@ export function QuickOrderForm({
     setSubmitting(true);
 
     try {
-      const draftSessionId = await abandonedCheckout.saveBeforeSubmit().catch((error) => {
-        console.error("Failed to save checkout draft before order placement", error);
-        return null;
-      });
+      // 1. Anti-fraud & Blacklist Verification
+      if (fraudProtection) {
+        const blockedList = fraudProtection.blockedTargets || [];
+        const cleanPhone = phone.trim();
+
+        const isBlocked = blockedList.some(
+          (t) =>
+            (t.type === "ip" && fraudProtection.enableIpBlock && t.value === clientIp) ||
+            (t.type === "phone" && fraudProtection.enablePhoneBlock && t.value === cleanPhone)
+        );
+
+        if (isBlocked) {
+          toast(
+            locale === "ar"
+              ? "عذراً، لا يمكن إتمام هذا الطلب في الوقت الحالي. يرجى التواصل مع خدمة العملاء."
+              : "Impossible de valider la commande pour le moment. Veuillez contacter le support."
+          );
+          setSubmitting(false);
+          return;
+        }
+
+        // 2. Re-order Cooldown Verification
+        if (fraudProtection.enableCooldown && fraudProtection.reorderCooldownHours > 0) {
+          try {
+            const recentOrdersKey = `recent_orders_${product.id}`;
+            const stored = localStorage.getItem(recentOrdersKey);
+            if (stored) {
+              const history: Array<{ time: number; phone: string; ip: string }> = JSON.parse(stored);
+              const now = Date.now();
+              const cooldownMs = fraudProtection.reorderCooldownHours * 3600 * 1000;
+              const validRecent = history.filter((h) => now - h.time < cooldownMs);
+              const matchingCount = validRecent.filter((h) => h.phone === cleanPhone || h.ip === clientIp).length;
+
+              if (matchingCount >= (fraudProtection.maxAllowedOrders || 1)) {
+                toast(
+                  locale === "ar"
+                    ? `عذراً، لقد قمت بطلب هذا المنتج مؤخراً. يرجى الانتظار (${fraudProtection.reorderCooldownHours} ساعة) قبل تقديم طلب جديد.`
+                    : `Vous avez déjà commandé ce produit. Veuillez patienter (${fraudProtection.reorderCooldownHours}h) avant de renouveler.`
+                );
+                setSubmitting(false);
+                return;
+              }
+            }
+          } catch {
+            // Ignore storage errors
+          }
+        }
+      }
+
       const qty = selectedOffer ? selectedOffer.quantity : 1;
       const activeVariant = product.variants.find(
         (variant) =>
@@ -184,15 +290,6 @@ export function QuickOrderForm({
           (!selectedColorHex ||
             variant.colorHex.toLowerCase() === selectedColorHex.toLowerCase()),
       );
-      if (!activeVariant || activeVariant.stock < qty) {
-        toast(
-          locale === "ar"
-            ? "الكمية المطلوبة غير متوفرة لهذا المقاس واللون."
-            : "Cette combinaison taille/couleur n'est pas disponible en quantité suffisante.",
-        );
-        setSubmitting(false);
-        return;
-      }
 
       const ref = orderReference();
       const attribution = getAttributedTrafficSource();
@@ -213,6 +310,7 @@ export function QuickOrderForm({
         offerTitle: selectedOffer ? (selectedOffer.title[locale] || selectedOffer.title.ar) : undefined,
         trafficSource: attribution.source,
         utmCampaign: attribution.campaign,
+        clientIp: clientIp,
         createdAt: new Date().toISOString(),
         items: [
           {
@@ -230,11 +328,20 @@ export function QuickOrderForm({
         ],
       };
 
+      // Fast non-blocking draft save
+      const draftPromise = abandonedCheckout.saveBeforeSubmit().catch(() => null);
+
       if (isSupabaseConfigured()) {
-        newOrder.reference = await placeOrderDb(createClient()!, newOrder, draftSessionId ?? undefined);
-        await useCatalogStore.getState().refresh();
+        const draftSessionId = await Promise.race([
+          draftPromise,
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 300)),
+        ]);
+        const serverRef = await placeOrderDb(createClient()!, newOrder, draftSessionId ?? undefined);
+        if (serverRef) newOrder.reference = serverRef;
+        // Run refresh in background without delaying user
+        void useCatalogStore.getState().refresh().catch(() => {});
       } else if (activeVariant) {
-        await setVariantStock(product.id, activeVariant.id, Math.max(0, activeVariant.stock - qty));
+        void setVariantStock(product.id, activeVariant.id, Math.max(0, activeVariant.stock - qty));
       }
 
       addOrder(newOrder);
@@ -250,13 +357,20 @@ export function QuickOrderForm({
           quantity: item.quantity,
         })),
       });
-      if (draftSessionId && !isSupabaseConfigured()) {
-        await abandonedCheckout.markCompleted(newOrder.reference).catch((error) => {
-          console.error("Failed to mark checkout draft as converted", error);
-        });
+
+      // Record order in local cooldown history
+      try {
+        const recentOrdersKey = `recent_orders_${product.id}`;
+        const stored = localStorage.getItem(recentOrdersKey);
+        const history: Array<{ time: number; phone: string; ip: string }> = stored ? JSON.parse(stored) : [];
+        history.push({ time: Date.now(), phone: phone.trim(), ip: clientIp });
+        localStorage.setItem(recentOrdersKey, JSON.stringify(history.slice(-20)));
+      } catch {
+        // Ignore storage errors
       }
-      toast(locale === "ar" ? "تم تسجيل طلبك بنجاح! سنتصل بك لتأكيده." : "Commande enregistrée avec succès !");
-      router.push(`/${locale}/checkout/success?ref=${ref}`);
+
+      // Instant redirect to thank you page
+      router.push(`/${locale}/checkout/success?ref=${newOrder.reference || ref}`);
     } catch {
       toast(locale === "ar" ? "حدث خطأ أثناء إرسال الطلب، أعد المحاولة." : "Erreur lors de la validation");
       setSubmitting(false);
@@ -482,16 +596,16 @@ export function QuickOrderForm({
         </div>
 
         {/* Variants (Size & Color) Placed ABOVE Offers */}
-        {(product.sizes.length > 0 || product.colors.length > 0) && (
+        {(availableSizes.length > 0 || availableColors.length > 0) && (
           <div className="space-y-3 rounded-xl border border-zinc-200/80 bg-zinc-50/80 p-3.5 dark:border-zinc-800 dark:bg-zinc-800/50">
             {/* Sizes */}
-            {product.sizes.length > 0 && (
+            {availableSizes.length > 0 && (
               <div>
                 <p className="mb-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                   {locale === "ar" ? "المقاس المطلوب:" : "Taille :"}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {product.sizes.map((s) => (
+                  {availableSizes.map((s) => (
                     <button
                       key={s}
                       type="button"
@@ -511,13 +625,13 @@ export function QuickOrderForm({
             )}
 
             {/* Colors */}
-            {product.colors.length > 0 && (
+            {availableColors.length > 0 && (
               <div>
                 <p className="mb-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                   {locale === "ar" ? "اللون المفضل:" : "Couleur :"}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
-                  {product.colors.map((c) => {
+                  {availableColors.map((c) => {
                     const isSelected = selectedColorHex?.toLowerCase() === c.hex.toLowerCase();
                     return (
                       <button
@@ -620,8 +734,8 @@ export function QuickOrderForm({
         {/* Big Green Buy Now Button */}
         <button
           type="submit"
-          disabled={submitting}
-          className="group relative flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 py-4 text-base font-bold text-white shadow-lg shadow-emerald-600/30 transition-all hover:from-emerald-500 hover:to-green-500 hover:shadow-xl active:scale-[0.99] disabled:opacity-70"
+          disabled={isButtonDisabled}
+          className="group relative flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 py-4 text-base font-bold text-white shadow-lg shadow-emerald-600/30 transition-all hover:from-emerald-500 hover:to-green-500 hover:shadow-xl active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {submitting ? (
             <span className="flex items-center gap-2">
@@ -630,7 +744,7 @@ export function QuickOrderForm({
             </span>
           ) : (
             <span className="flex items-center gap-2 tracking-wide">
-              <span>{locale === "ar" ? "اشتري الآن" : "Acheter maintenant"}</span>
+              <span>{storefront?.productForm?.buttonText?.[locale] || storefront?.productForm?.buttonText?.ar || (locale === "ar" ? "اشتري الآن" : "Acheter maintenant")}</span>
               <span className="rounded-md bg-white/20 px-2 py-0.5 text-sm font-extrabold">
                 {formatPrice(currentPrice, locale)}
               </span>

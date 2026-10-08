@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   Phone,
@@ -29,6 +29,7 @@ import {
   MessageSquare,
   Sparkles,
   ExternalLink,
+  Save,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Order, OrderStatus, TrafficSource } from "@/types";
@@ -66,6 +67,79 @@ export function getOrderTrafficSource(order: Order): TrafficSource {
   return sources[hash % sources.length];
 }
 
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 4) {
+    return [1, 2, 3, 4, 5, "...", total];
+  }
+  if (current >= total - 3) {
+    return [1, "...", total - 4, total - 3, total - 2, total - 1, total];
+  }
+  return [1, "...", current - 1, current, current + 1, "...", total];
+}
+
+function OrderNoteEditor({ order, locale }: { order: Order; locale: string }) {
+  const updateOrder = useCatalogStore((s) => s.updateOrder);
+  const [noteText, setNoteText] = useState(order.notes || "");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+
+  useEffect(() => {
+    setNoteText(order.notes || "");
+  }, [order.notes]);
+
+  async function handleSaveNote() {
+    setIsSaving(true);
+    try {
+      const updated = { ...order, notes: noteText.trim() };
+      await updateOrder(updated);
+      setIsSaved(true);
+      toast(locale === "ar" ? "✅ تم حفظ ملاحظات الطلب بنجاح!" : "✅ Note enregistrée !");
+      setTimeout(() => setIsSaved(false), 2500);
+    } catch {
+      toast(locale === "ar" ? "حدث خطأ أثناء حفظ الملاحظة" : "Erreur lors de l'enregistrement");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="pt-2 border-t border-zinc-800 space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-zinc-400 text-[11px] font-bold flex items-center gap-1.5">
+          <MessageSquare size={13} className="text-purple-400" />
+          <span>{locale === "ar" ? "شريط الملاحظات على الطلب:" : "Notes sur la commande :"}</span>
+        </label>
+        {isSaved && (
+          <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1 animate-pulse">
+            <Check size={11} /> {locale === "ar" ? "تم الحفظ" : "Enregistré"}
+          </span>
+        )}
+      </div>
+      <textarea
+        value={noteText}
+        onChange={(e) => setNoteText(e.target.value)}
+        rows={2}
+        placeholder={locale === "ar" ? "أدخل ملاحظات حول هذا الطلب (مثال: طلب الاتصال بعد 2 زوالاً)..." : "Ajouter une note..."}
+        className="w-full rounded-lg border border-zinc-700 bg-zinc-900/90 p-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+      />
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={handleSaveNote}
+          disabled={isSaving}
+          className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-purple-700 active:scale-95 disabled:opacity-50"
+        >
+          <Save size={13} />
+          <span>{isSaving ? (locale === "ar" ? "جاري الحفظ..." : "Enregistrement...") : (locale === "ar" ? "حفظ الملاحظة" : "Enregistrer")}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function AdminOrdersTable({
   orders,
   onStatusChange,
@@ -91,10 +165,24 @@ export function AdminOrdersTable({
   const [bulkStatusToChange, setBulkStatusToChange] = useState<OrderStatus>("confirmed");
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
-  // Close floating dropdown on scroll or window resize
+  // Pagination state (10 items per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  // Reset page to 1 when filters change
   useEffect(() => {
-    function handleScrollOrResize() {
-      if (floatingDropdown) setFloatingDropdown(null);
+    setCurrentPage(1);
+  }, [statusFilter, sourceFilter, searchQuery]);
+
+  // Close floating dropdown on scroll or window resize (ignore scroll inside the menu itself)
+  useEffect(() => {
+    function handleScrollOrResize(e: Event) {
+      if (!floatingDropdown) return;
+      const target = e.target as HTMLElement | null;
+      if (target && typeof target.closest === "function" && target.closest(".floating-status-menu")) {
+        return; // Do not close if scrolling inside the dropdown menu!
+      }
+      setFloatingDropdown(null);
     }
     window.addEventListener("scroll", handleScrollOrResize, true);
     window.addEventListener("resize", handleScrollOrResize);
@@ -139,6 +227,12 @@ export function AdminOrdersTable({
       (o.notes && o.notes.toLowerCase().includes(query));
     return matchesStatus && matchesSource && matchesSearch;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredOrders.slice(start, start + pageSize);
+  }, [filteredOrders, currentPage, pageSize]);
 
   const statusBadges: Record<OrderStatus, { bg: string; text: string; label: string; icon: LucideIcon }> = {
     pending: {
@@ -795,7 +889,7 @@ export function AdminOrdersTable({
                 </td>
               </tr>
             ) : (
-              filteredOrders.map((o) => {
+              paginatedOrders.map((o) => {
                 const firstItem = o.items[0];
                 const badge = statusBadges[o.status] || statusBadges.pending;
                 const BadgeIcon = badge.icon;
@@ -1019,21 +1113,8 @@ export function AdminOrdersTable({
                                   </div>
                                 )}
 
-                                {/* Customer Notes / Remarks (لائحة الملاحظات) */}
-                                <div className="pt-1">
-                                  <span className="text-zinc-400 block text-[10px] font-bold mb-1 flex items-center gap-1.5">
-                                    <MessageSquare size={12} className="text-emerald-400" />
-                                    <span>{locale === "ar" ? "ملاحظة العميل:" : "Note du client :"}</span>
-                                  </span>
-                                  <div className={cn(
-                                    "rounded-lg p-2.5 text-xs font-semibold leading-relaxed border",
-                                    o.notes?.trim()
-                                      ? "bg-emerald-950/40 border-emerald-700/60 text-emerald-300"
-                                      : "bg-zinc-900 border-zinc-800 text-zinc-400"
-                                  )}>
-                                    {o.notes?.trim() ? o.notes : (locale === "ar" ? "بدون ملاحظة" : "Sans remarque")}
-                                  </div>
-                                </div>
+                                {/* Customer Notes / Remarks (لائحة وشريط الملاحظات) */}
+                                <OrderNoteEditor order={o} locale={locale} />
 
                                 {/* WhatsApp Customer Quick Messaging Bar */}
                                 <div className="pt-2 border-t border-zinc-800">
@@ -1152,6 +1233,65 @@ export function AdminOrdersTable({
         </table>
       </div>
 
+      {/* Pagination Controls (10 orders per page) */}
+      {filteredOrders.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="text-xs text-zinc-500">
+            {locale === "ar"
+              ? `عرض ${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, filteredOrders.length)} من إجمالي ${filteredOrders.length} طلب`
+              : `Affichage de ${(currentPage - 1) * pageSize + 1} à ${Math.min(currentPage * pageSize, filteredOrders.length)} sur ${filteredOrders.length} commandes`}
+          </div>
+
+          <div className="flex items-center gap-1.5" dir="ltr">
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-300"
+              title={locale === "ar" ? "الصفحة السابقة" : "Précédent"}
+            >
+              ‹
+            </button>
+
+            {getPageNumbers(currentPage, totalPages).map((p, idx) => {
+              if (p === "...") {
+                return (
+                  <span key={`dots-${idx}`} className="px-1 text-xs text-zinc-400">
+                    ...
+                  </span>
+                );
+              }
+              const isCurr = p === currentPage;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setCurrentPage(p as number)}
+                  className={cn(
+                    "flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold transition",
+                    isCurr
+                      ? "bg-purple-600 text-white shadow-xs"
+                      : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300"
+                  )}
+                >
+                  {p}
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-300"
+              title={locale === "ar" ? "الصفحة التالية" : "Suivant"}
+            >
+              ›
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Floating Status & Dispatch Dropdown Menu (Fixed in Viewport to never be clipped) */}
       {floatingDropdown && activeFloatingOrder && (
         <>
@@ -1170,9 +1310,11 @@ export function AdminOrdersTable({
               left: floatingDropdown.left !== undefined ? `${floatingDropdown.left}px` : "auto",
               right: floatingDropdown.right !== undefined ? `${floatingDropdown.right}px` : "auto",
             }}
-            className="z-[9999] max-h-[380px] w-64 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-2xl border border-zinc-700/80 bg-[#1c1a22] p-2 text-zinc-100 shadow-2xl backdrop-blur-md"
+            className="floating-status-menu custom-scrollbar z-[9999] max-h-[380px] w-64 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-2xl border border-zinc-700/80 bg-[#1c1a22] p-2 text-zinc-100 shadow-2xl backdrop-blur-md"
             dir={locale === "ar" ? "rtl" : "ltr"}
             onClick={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
           >
             <div className="px-2 py-1 mb-1 text-[10px] font-bold text-zinc-400 border-b border-zinc-800">
               {locale === "ar" ? "تغيير حالة الطلب:" : "Changer le statut :"}

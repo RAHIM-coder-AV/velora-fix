@@ -115,10 +115,61 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     },
     productForm: {
       intro: {
-        ar: "املأ الاستمارة في الأسفل لتقديم طلبك.",
-        fr: "Remplissez le formulaire ci-dessous pour commander.",
+        ar: "املأ الإستمارة في الأسفل لتقديم طلبك",
+        fr: "Remplissez le formulaire ci-dessous pour commander",
       },
+      buttonText: {
+        ar: "اشتري الآن",
+        fr: "Acheter maintenant",
+      },
+      buttonDisableMode: "never",
+      showName: true,
+      namePlaceholder: {
+        ar: "الإسم و اللقب",
+        fr: "Nom et prénom",
+      },
+      nameRequired: true,
+      showPhone: true,
+      phonePlaceholder: {
+        ar: "رقم الهاتف",
+        fr: "Numéro de téléphone",
+      },
+      phoneRequired: true,
+      minPhoneDigits: 10,
+      maxPhoneDigits: 10,
+      showWilaya: true,
+      wilayaPlaceholder: {
+        ar: "الولاية",
+        fr: "Wilaya",
+      },
+      wilayaRequired: true,
+      allowManualWilaya: false,
+      showCommune: true,
+      communePlaceholder: {
+        ar: "البلدية",
+        fr: "Commune",
+      },
+      communeRequired: true,
+      allowManualCommune: false,
       showAddress: true,
+      addressPlaceholder: {
+        ar: "العنوان",
+        fr: "Adresse",
+      },
+      addressRequired: false,
+      showNotes: false,
+      notesPlaceholder: {
+        ar: "ملاحظات إضافية حول التوصيل",
+        fr: "Notes supplémentaires pour la livraison",
+      },
+      notesRequired: false,
+      keepSummaryOpen: false,
+      hidePhoneNotice: false,
+      hideShippingPrice: false,
+      showFreeShippingBadge: true,
+      hideOrderSummary: false,
+      enableSpamProtection: true,
+      blockDuplicateOrdersMinutes: 5,
     },
     thankYou: {
       title: {
@@ -143,4 +194,38 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
       },
     },
   },
+  fraudProtection: {
+    maxAllowedOrders: 1,
+    reorderCooldownHours: 48,
+    enableIpBlock: true,
+    enablePhoneBlock: true,
+    enableCooldown: true,
+    autoDeleteSpam: false,
+    blockedTargets: [
+      {
+        id: "blk-1",
+        type: "ip",
+        value: "197.200.14.22",
+        reason: "طلبات وهمية متكررة",
+        blockedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+      },
+      {
+        id: "blk-2",
+        type: "ip",
+        value: "105.101.44.110",
+        reason: "إلغاء مستمر عند التوصيل",
+        blockedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+      },
+      {
+        id: "blk-3",
+        type: "phone",
+        value: "0555001122",
+        reason: "رقم وهمي / لا يرد",
+        blockedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+      },
+    ],
+    deletedOrdersCount: 14,
+    autoDeletedOrdersCount: 28,
+  },
 };
+

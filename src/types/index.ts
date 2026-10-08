@@ -162,6 +162,7 @@ export interface Order {
   trafficSource?: TrafficSource;
   utmSource?: string;
   utmCampaign?: string;
+  clientIp?: string;
   createdAt: string;
 }
 

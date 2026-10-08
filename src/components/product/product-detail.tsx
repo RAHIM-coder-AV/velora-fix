@@ -28,8 +28,52 @@ export function ProductDetail({
 }) {
   const { locale, dict } = useLocale();
   const [image, setImage] = useState(0);
-  const [size, setSize] = useState(product.sizes[0] || "M");
-  const [color, setColor] = useState(product.colors[0]?.hex || "#111111");
+
+  // Available sizes with stock > 0
+  const availableSizes = (() => {
+    if (!product.variants || product.variants.length === 0) return product.sizes;
+    const inStock = product.sizes.filter((s) =>
+      product.variants.some((v) => v.size === s && v.stock > 0)
+    );
+    return inStock.length > 0 ? inStock : product.sizes;
+  })();
+
+  const initialSize = availableSizes[0] || product.sizes[0] || "M";
+
+  // Available colors for the size with stock > 0
+  const getAvailableColorsForSize = (targetSize: string) => {
+    if (!product.variants || product.variants.length === 0) return product.colors;
+    const inStock = product.colors.filter((c) =>
+      product.variants.some(
+        (v) =>
+          v.size === targetSize &&
+          v.colorHex.toLowerCase() === c.hex.toLowerCase() &&
+          v.stock > 0
+      )
+    );
+    if (inStock.length > 0) return inStock;
+    const inStockAny = product.colors.filter((c) =>
+      product.variants.some(
+        (v) => v.colorHex.toLowerCase() === c.hex.toLowerCase() && v.stock > 0
+      )
+    );
+    return inStockAny.length > 0 ? inStockAny : product.colors;
+  };
+
+  const initialColors = getAvailableColorsForSize(initialSize);
+  const initialColor = initialColors[0]?.hex || product.colors[0]?.hex || "#111111";
+
+  const [size, setSize] = useState(initialSize);
+  const [color, setColor] = useState(initialColor);
+
+  const handleSizeChange = (newSize: string) => {
+    setSize(newSize);
+    const validColors = getAvailableColorsForSize(newSize);
+    if (validColors.length > 0 && !validColors.some((c) => c.hex.toLowerCase() === color.toLowerCase())) {
+      setColor(validColors[0].hex);
+    }
+  };
+
   const addItem = useCartStore((s) => s.addItem);
   const toggleWish = useWishlistStore((s) => s.toggle);
   const wished = useWishlistStore((s) => s.ids.includes(product.id));
@@ -171,7 +215,7 @@ export function ProductDetail({
             product={product}
             selectedSize={size}
             selectedColorHex={color}
-            onSizeChange={setSize}
+            onSizeChange={handleSizeChange}
             onColorChange={setColor}
           />
 

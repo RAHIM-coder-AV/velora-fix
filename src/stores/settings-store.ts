@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { SharedStoreSettings, StoreSettings, WilayaDeliveryPrice } from "@/types/settings";
+import type { BlockedTarget, OrdersFraudSettings, SharedStoreSettings, StoreSettings, WilayaDeliveryPrice } from "@/types/settings";
 import type { ProductShippingConfig } from "@/types";
 import { DEFAULT_STORE_SETTINGS } from "@/lib/default-settings";
 import { createClient } from "@/lib/supabase/client";
@@ -19,6 +19,9 @@ interface SettingsState {
   updateEcoTrack: (ecotrack: Partial<StoreSettings["ecotrack"]>) => void;
   updateNordEtOuest: (nordEtOuest: Partial<StoreSettings["nordEtOuest"]>) => void;
   updatePixels: (pixels: StoreSettings["pixels"]) => Promise<void>;
+  updateFraudProtection: (partial: Partial<OrdersFraudSettings>) => void;
+  blockTarget: (target: { type: "ip" | "phone"; value: string; reason?: string }) => void;
+  unblockTarget: (id: string) => void;
   refreshPixels: () => Promise<void>;
   refreshSharedSettings: () => Promise<void>;
   saveSharedSettings: () => Promise<void>;
@@ -112,6 +115,60 @@ export const useSettingsStore = create<SettingsState>()(
         }));
       },
 
+      updateFraudProtection: (partial) => {
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            fraudProtection: {
+              ...(state.settings.fraudProtection || DEFAULT_STORE_SETTINGS.fraudProtection!),
+              ...partial,
+            },
+          },
+        }));
+      },
+
+      blockTarget: ({ type, value, reason }) => {
+        set((state) => {
+          const current = state.settings.fraudProtection || DEFAULT_STORE_SETTINGS.fraudProtection!;
+          const cleanedVal = value.trim();
+          if (!cleanedVal) return state;
+          if (current.blockedTargets.some((t) => t.value === cleanedVal && t.type === type)) {
+            return state;
+          }
+          const newTarget: BlockedTarget = {
+            id: `blk-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            type,
+            value: cleanedVal,
+            reason: reason || "حظر يدوي بواسطة المسؤول",
+            blockedAt: new Date().toISOString(),
+          };
+          return {
+            settings: {
+              ...state.settings,
+              fraudProtection: {
+                ...current,
+                blockedTargets: [newTarget, ...current.blockedTargets],
+              },
+            },
+          };
+        });
+      },
+
+      unblockTarget: (id) => {
+        set((state) => {
+          const current = state.settings.fraudProtection || DEFAULT_STORE_SETTINGS.fraudProtection!;
+          return {
+            settings: {
+              ...state.settings,
+              fraudProtection: {
+                ...current,
+                blockedTargets: current.blockedTargets.filter((t) => t.id !== id),
+              },
+            },
+          };
+        });
+      },
+
       refreshSharedSettings: async () => {
         const client = isSupabaseConfigured() ? createClient() : null;
         if (!client) return;
@@ -125,6 +182,7 @@ export const useSettingsStore = create<SettingsState>()(
             nordEtOuest: state.settings.nordEtOuest,
             pixels: state.settings.pixels,
             storefront: mergeStorefrontConfiguration(shared.storefront),
+            fraudProtection: shared.fraudProtection || state.settings.fraudProtection || DEFAULT_STORE_SETTINGS.fraudProtection,
           },
         }));
       },
@@ -140,6 +198,7 @@ export const useSettingsStore = create<SettingsState>()(
           freeShippingThreshold: current.freeShippingThreshold,
           wilayaPrices: current.wilayaPrices,
           storefront: current.storefront,
+          fraudProtection: current.fraudProtection,
         };
         await db.saveSharedStoreSettings(client, shared);
       },

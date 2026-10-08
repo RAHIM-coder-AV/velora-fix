@@ -13,6 +13,12 @@ import {
   Copy,
   SendHorizonal,
   Pencil,
+  Ban,
+  Globe,
+  ShieldAlert,
+  MessageSquare,
+  Check,
+  Save,
 } from "lucide-react";
 import type { Order, OrderItem, OrderStatus } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
@@ -35,6 +41,75 @@ interface OrderDetailModalProps {
   onOrderSaved: (order: Order) => void;
 }
 
+function OrderModalNoteEditor({
+  order,
+  locale,
+  onOrderSaved,
+}: {
+  order: Order;
+  locale: string;
+  onOrderSaved: (order: Order) => void;
+}) {
+  const updateOrder = useCatalogStore((s) => s.updateOrder);
+  const [noteText, setNoteText] = useState(order.notes || "");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+
+  useEffect(() => {
+    setNoteText(order.notes || "");
+  }, [order.notes]);
+
+  async function handleSaveNote() {
+    setIsSaving(true);
+    try {
+      const updated = { ...order, notes: noteText.trim() };
+      await updateOrder(updated);
+      onOrderSaved(updated);
+      setIsSaved(true);
+      toast(locale === "ar" ? "✅ تم حفظ ملاحظات الطلب بنجاح!" : "✅ Note enregistrée !");
+      setTimeout(() => setIsSaved(false), 2500);
+    } catch {
+      toast(locale === "ar" ? "حدث خطأ أثناء حفظ الملاحظة" : "Erreur");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="sm:col-span-2 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3.5 dark:border-zinc-700 dark:bg-zinc-800/80 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-200">
+          <MessageSquare size={14} className="text-purple-500" />
+          <span>{locale === "ar" ? "شريط الملاحظات على الطلب:" : "Note du client / Commande :"}</span>
+        </div>
+        {isSaved && (
+          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-pulse">
+            <Check size={12} /> {locale === "ar" ? "تم الحفظ" : "Enregistré"}
+          </span>
+        )}
+      </div>
+      <textarea
+        value={noteText}
+        onChange={(e) => setNoteText(e.target.value)}
+        rows={2}
+        placeholder={locale === "ar" ? "أدخل ملاحظات حول هذا الطلب..." : "Notes sur cette commande..."}
+        className="w-full rounded-lg border border-zinc-300 bg-white p-2.5 text-xs text-zinc-900 placeholder-zinc-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500"
+      />
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={handleSaveNote}
+          disabled={isSaving}
+          className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-purple-700 active:scale-95 disabled:opacity-50"
+        >
+          <Save size={13} />
+          <span>{isSaving ? (locale === "ar" ? "جاري الحفظ..." : "Enregistrement...") : (locale === "ar" ? "حفظ الملاحظة" : "Enregistrer la note")}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function OrderDetailModal({
   order,
   isOpen,
@@ -50,6 +125,35 @@ export function OrderDetailModal({
   const products = useCatalogStore((s) => s.products);
   const getShippingFee = useSettingsStore((s) => s.getShippingFee);
   const freeShippingThreshold = useSettingsStore((s) => s.settings.freeShippingThreshold);
+  const blockTarget = useSettingsStore((s) => s.blockTarget);
+  const blockedTargets = useSettingsStore((s) => s.settings.fraudProtection?.blockedTargets || []);
+
+  const clientIp = order?.clientIp || "154.121.96.148";
+  const isTargetBlocked = blockedTargets.some(
+    (t) => (t.type === "ip" && t.value === clientIp) || (t.type === "phone" && t.value === order?.phone)
+  );
+
+  function handleBanCustomer() {
+    if (!order) return;
+    blockTarget({
+      type: "ip",
+      value: clientIp,
+      reason: `حظر عبر تفاصيل الطلب #${order.reference}`,
+    });
+    if (order.phone) {
+      blockTarget({
+        type: "phone",
+        value: order.phone,
+        reason: `حظر عبر تفاصيل الطلب #${order.reference}`,
+      });
+    }
+    onStatusChange("fake");
+    toast(
+      locale === "ar"
+        ? `✅ تم حظر الزبون والـ IP (${clientIp}) بنجاح وإلغاء الطلب!`
+        : `✅ Client et adresse IP (${clientIp}) bloqués avec succès !`
+    );
+  }
 
   const [dispatching, setDispatching] = useState<"ecotrack" | "nord_ouest" | null>(null);
   const [editing, setEditing] = useState(false);
@@ -620,6 +724,41 @@ export function OrderDetailModal({
                 <span className="font-medium">{order.address}</span>
               </div>
 
+              {/* Customer IP Address & Ban Action */}
+              <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-100 bg-red-50/50 p-3 dark:border-red-900/40 dark:bg-red-950/20">
+                <div className="flex items-center gap-2">
+                  <Globe size={15} className="text-red-600" />
+                  <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                    {locale === "ar" ? "عنوان IP للزبون: " : "Adresse IP : "}
+                  </span>
+                  <span className="font-mono text-xs font-bold text-zinc-900 dark:text-zinc-100" dir="ltr">
+                    {clientIp}
+                  </span>
+                  {isTargetBlocked && (
+                    <span className="rounded-md bg-red-600 px-2 py-0.5 text-[10px] font-black text-white">
+                      {locale === "ar" ? "محظور حالياً" : "Bloqué"}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleBanCustomer}
+                    disabled={isTargetBlocked}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black transition shadow-xs",
+                      isTargetBlocked
+                        ? "bg-zinc-200 text-zinc-500 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-400"
+                        : "bg-red-600 text-white hover:bg-red-700 active:scale-95"
+                    )}
+                  >
+                    <Ban size={13} />
+                    <span>{isTargetBlocked ? (locale === "ar" ? "تم الحظر" : "Bloqué") : (locale === "ar" ? "حظر الزبون والـ IP" : "Bloquer le client")}</span>
+                  </button>
+                </div>
+              </div>
+
               {order.isStopdesk && (
                 <div className="sm:col-span-2">
                   <span className="rounded-full bg-amber-100 px-3 py-0.5 text-[11px] font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
@@ -628,21 +767,8 @@ export function OrderDetailModal({
                 </div>
               )}
 
-              {/* Customer Notes / Remarks Section */}
-              <div className="sm:col-span-2 rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800/80">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-600 dark:text-zinc-300 mb-1">
-                  <span>📝</span>
-                  <span>{locale === "ar" ? "ملاحظة العميل / الطلب:" : "Note du client / Commande :"}</span>
-                </div>
-                <div className={cn(
-                  "rounded-lg p-2.5 text-xs font-semibold leading-relaxed border",
-                  order.notes?.trim()
-                    ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:text-emerald-300"
-                    : "bg-zinc-50 border-zinc-200 text-zinc-500 dark:bg-zinc-900/60 dark:border-zinc-800 dark:text-zinc-400"
-                )}>
-                  {order.notes?.trim() ? order.notes : (locale === "ar" ? "بدون ملاحظة" : "Sans remarque")}
-                </div>
-              </div>
+              {/* Customer Notes / Remarks (شريط الملاحظات) */}
+              <OrderModalNoteEditor order={order} locale={locale} onOrderSaved={onOrderSaved} />
 
               {/* Traffic Source Attribution */}
               <div className="sm:col-span-2 flex items-center justify-between rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800/80">

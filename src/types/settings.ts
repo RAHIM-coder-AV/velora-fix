@@ -31,6 +31,54 @@ export interface PixelSettings {
   tiktokPixelEnabled: boolean[];
 }
 
+export interface ProductFormConfiguration {
+  intro: { ar: string; fr: string };
+  buttonText?: { ar: string; fr: string };
+  buttonDisableMode?: "never" | "out_of_stock" | "invalid_fields"; // تحديد متى يتعطل زر الشراء
+  
+  // Customer info
+  showName?: boolean;
+  namePlaceholder?: { ar: string; fr: string };
+  nameRequired?: boolean;
+
+  showPhone?: boolean;
+  phonePlaceholder?: { ar: string; fr: string };
+  phoneRequired?: boolean;
+  minPhoneDigits?: number;
+  maxPhoneDigits?: number;
+
+  // Address info
+  showWilaya?: boolean;
+  wilayaPlaceholder?: { ar: string; fr: string };
+  wilayaRequired?: boolean;
+  allowManualWilaya?: boolean;
+
+  showCommune?: boolean;
+  communePlaceholder?: { ar: string; fr: string };
+  communeRequired?: boolean;
+  allowManualCommune?: boolean;
+
+  showAddress: boolean;
+  addressPlaceholder?: { ar: string; fr: string };
+  addressRequired?: boolean;
+
+  // Notes
+  showNotes?: boolean;
+  notesPlaceholder?: { ar: string; fr: string };
+  notesRequired?: boolean;
+
+  // Other options
+  keepSummaryOpen?: boolean;
+  hidePhoneNotice?: boolean;
+  hideShippingPrice?: boolean;
+  showFreeShippingBadge?: boolean;
+  hideOrderSummary?: boolean;
+
+  // Fake orders protection
+  enableSpamProtection?: boolean;
+  blockDuplicateOrdersMinutes?: number;
+}
+
 export interface StorefrontConfiguration {
   storeName: string;
   storeTagline: string;
@@ -52,10 +100,7 @@ export interface StorefrontConfiguration {
     showNotes: boolean;
     intro: { ar: string; fr: string };
   };
-  productForm: {
-    intro: { ar: string; fr: string };
-    showAddress: boolean;
-  };
+  productForm: ProductFormConfiguration;
   thankYou: {
     title: { ar: string; fr: string };
     highlightBanner?: { ar: string; fr: string };
@@ -79,6 +124,26 @@ export interface WhatsAppNotificationSettings {
   shippedTemplate?: string;
 }
 
+export interface BlockedTarget {
+  id: string;
+  type: "ip" | "phone";
+  value: string;
+  reason?: string;
+  blockedAt: string;
+}
+
+export interface OrdersFraudSettings {
+  maxAllowedOrders: number; // عدد الطلبات المسموح بها
+  reorderCooldownHours: number; // الوقت بالساعات لإعادة الطلب من جديد
+  enableIpBlock: boolean;
+  enablePhoneBlock: boolean;
+  enableCooldown: boolean;
+  autoDeleteSpam: boolean;
+  blockedTargets: BlockedTarget[];
+  deletedOrdersCount?: number;
+  autoDeletedOrdersCount?: number;
+}
+
 export interface StoreSettings {
   shippingType: "custom" | "fixed" | "free";
   defaultHomePrice: number;
@@ -91,6 +156,7 @@ export interface StoreSettings {
   telegram?: TelegramNotificationSettings;
   whatsapp?: WhatsAppNotificationSettings;
   storefront: StorefrontConfiguration;
+  fraudProtection?: OrdersFraudSettings;
 }
 
 export type SharedStoreSettings = Pick<
@@ -101,4 +167,6 @@ export type SharedStoreSettings = Pick<
   | "freeShippingThreshold"
   | "wilayaPrices"
   | "storefront"
+  | "fraudProtection"
 >;
+

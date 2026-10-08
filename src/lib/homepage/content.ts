@@ -113,7 +113,7 @@ export function createDefaultHomepageContent(
       },
       {
         id: "editorial",
-        visible: true,
+        visible: false,
         order: 3,
         title: local("Fabriqué pour durer", "صُنع ليدوم"),
         body: local(
@@ -219,15 +219,22 @@ export function productsForHomepageSection(
   products: Product[],
 ): Product[] {
   const available = products.filter((product) => product.active !== false);
+  const limit = section.id === "featured" ? 8 : 4;
   if (section.selectionMode === "curated") {
     const bySlug = new Map(available.map((product) => [product.slug, product]));
-    return section.productSlugs.flatMap((slug) => {
+    const curated = section.productSlugs.flatMap((slug) => {
       const product = bySlug.get(slug);
       return product ? [product] : [];
     });
+    if (curated.length > 0) return curated;
+    return available.slice(0, limit);
   }
   const flag = section.id === "featured" ? "featured" : "isNew";
-  return available.filter((product) => product[flag]).slice(0, section.id === "featured" ? 8 : 4);
+  const filtered = available.filter((product) => product[flag]);
+  if (filtered.length > 0) {
+    return filtered.slice(0, limit);
+  }
+  return available.slice(0, limit);
 }
 
 export function moveHomepageSection(

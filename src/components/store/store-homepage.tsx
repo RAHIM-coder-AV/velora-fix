@@ -348,6 +348,10 @@ export function StoreHomepage({ locale }: StoreHomepageProps) {
           // Featured Products / Best Sellers
           if (section.id === "featured") {
             const selectedProducts = productsForHomepageSection(section, products);
+            const displayProducts =
+              selectedProducts.length > 0
+                ? selectedProducts
+                : products.filter((p) => p.active !== false).slice(0, 8);
             return (
               <section key={section.id} className="border-t border-stone-200 bg-white py-16 sm:py-24">
                 <div className="mx-auto max-w-7xl px-5 sm:px-8">
@@ -369,9 +373,9 @@ export function StoreHomepage({ locale }: StoreHomepageProps) {
                     </Link>
                   </div>
 
-                  {selectedProducts.length > 0 ? (
+                  {displayProducts.length > 0 ? (
                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
-                      {selectedProducts.map((product) => (
+                      {displayProducts.map((product) => (
                         <ProductCard key={product.id} product={product} />
                       ))}
                     </div>
@@ -385,71 +389,9 @@ export function StoreHomepage({ locale }: StoreHomepageProps) {
             );
           }
 
-          // Editorial & Lookbook Story
+          // Editorial & Lookbook Story (Hidden as requested)
           if (section.id === "editorial") {
-            const editorialImageUrl =
-              section.imageUrl && !section.imageUrl.includes("watermark")
-                ? section.imageUrl
-                : FALLBACK_EDITORIAL_IMAGE;
-
-            return (
-              <section key={section.id} className="border-t border-stone-200 bg-[#f4efe8] py-16 sm:py-24">
-                <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-5 sm:px-8 lg:grid-cols-12 lg:gap-16">
-                  {/* Left Column: Layered Lookbook Images (6 cols) */}
-                  <div className="relative lg:col-span-6">
-                    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-stone-200 shadow-2xl">
-                      <HomepageImage
-                        src={editorialImageUrl}
-                        alt={text(section.title, locale)}
-                        className="h-full w-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-stone-950/40 via-transparent to-transparent" />
-                    </div>
-
-                    {/* Floating Luxury Quote Badge */}
-                    <div className="absolute -bottom-6 end-6 hidden sm:block max-w-xs rounded-2xl border border-stone-200/80 bg-white/95 p-4 shadow-xl backdrop-blur-md">
-                      <p className="font-serif italic text-xs leading-relaxed text-stone-800">
-                        {isAr
-                          ? "«الأناقة الحقيقية تكمن في البساطة وجودة الخامات التي ترافقك كل يوم.»"
-                          : "« L'élégance réside dans la pureté des lignes et la sincérité des matières. »"}
-                      </p>
-                      <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                        — VELORA ATELIER
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Right Column: Narrative (6 cols) */}
-                  <div className="lg:col-span-6">
-                    <span className="text-xs font-bold uppercase tracking-[0.2em] text-amber-700">
-                      {isAr ? "قصة الدار والخياطة الرفيعة" : "L'ATELIER & LE SAVOIR-FAIRE"}
-                    </span>
-                    <h2 className="mt-2 font-serif text-3xl font-semibold leading-tight text-stone-950 sm:text-4xl md:text-5xl">
-                      {text(section.title, locale)}
-                    </h2>
-                    <p className="mt-6 text-base leading-relaxed text-stone-700 sm:text-lg sm:leading-8">
-                      {text(section.body, locale)}
-                    </p>
-
-                    <div className="mt-8 flex flex-wrap items-center gap-4">
-                      <Link
-                        href={localizedHref(section.firstLinkHref, locale)}
-                        className="inline-flex items-center gap-2 rounded-full bg-stone-950 px-6 py-3.5 text-xs font-semibold text-white shadow-md transition hover:bg-stone-800"
-                      >
-                        <span>{text(section.firstLinkLabel, locale)}</span>
-                        {isAr ? <ArrowLeft size={14} /> : <ArrowRight size={14} />}
-                      </Link>
-                      <Link
-                        href={localizedHref(section.secondLinkHref, locale)}
-                        className="inline-flex items-center gap-2 rounded-full border border-stone-800 px-6 py-3.5 text-xs font-semibold text-stone-950 transition hover:bg-stone-950/5"
-                      >
-                        <span>{text(section.secondLinkLabel, locale)}</span>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            );
+            return null;
           }
 
           // New Arrivals

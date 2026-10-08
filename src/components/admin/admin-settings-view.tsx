@@ -19,6 +19,7 @@ import {
   Palette,
   Send,
   MessageSquare,
+  ShieldAlert,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -26,6 +27,8 @@ import { PixelSettingsEditor } from "@/components/admin/pixel-settings-editor";
 import { AdminCategoriesSettings } from "@/components/admin/admin-categories-settings";
 import { AdminHomepageEditor } from "@/components/admin/admin-homepage-editor";
 import { AdminNotificationsSettings } from "@/components/admin/admin-notifications-settings";
+import { AdminFormSettings } from "@/components/admin/admin-form-settings";
+import { AdminOrdersSettings } from "@/components/admin/admin-orders-settings";
 import type { Category, Product } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
 import { toast } from "@/components/ui/toast";
@@ -41,6 +44,7 @@ type SettingsSection =
   | "nord_ouest"
   | "pixels"
   | "form"
+  | "orders_fraud"
   | "homepage"
   | "languages"
   | "categories"
@@ -286,6 +290,7 @@ export function AdminSettingsView({
               { title: locale === "ar" ? "هوية المتجر" : "Identité du magasin", description: locale === "ar" ? "اسم المتجر وشعاره النصي ورابط الشعار." : "Nom, slogan et logo de la boutique.", icon: Store, tab: "identity" as const },
               { title: locale === "ar" ? "إدارة الفئات" : "Catégories", description: locale === "ar" ? "إضافة الفئات وتعديل أسمائها ووصفها وصورها." : "Créer et modifier les catégories.", icon: Tags, tab: "categories" as const },
               { title: locale === "ar" ? "إعدادات النموذج" : "Formulaires", description: locale === "ar" ? "التحكم في حقول الطلب في السلة وصفحة المنتج." : "Champs de commande du panier et du produit.", icon: ClipboardList, tab: "form" as const },
+              { title: locale === "ar" ? "خصائص الطلبات المزيفة" : "Commandes suspectes / Anti-fraude", description: locale === "ar" ? "تحديد متى يعيد الزبون الطلب، وحظر عناوين IP والأرقام المشبوهة." : "Délais de commande et blocage IP / téléphone.", icon: ShieldAlert, tab: "orders_fraud" as const },
               { title: locale === "ar" ? "صفحة الشكر" : "Page de remerciement", description: locale === "ar" ? "تعديل العنوان والنص الظاهر بعد إتمام الطلب." : "Personnaliser le message après la commande.", icon: Check, tab: "thankyou" as const },
             ] satisfies Array<{ title: string; description: string; icon: LucideIcon; tab: SettingsSection }>).map((card) => {
               const Icon = card.icon;
@@ -411,6 +416,19 @@ export function AdminSettingsView({
           >
             <ClipboardList size={14} className="text-indigo-500" />
             <span>{locale === "ar" ? "النماذج" : "Formulaires"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("orders_fraud")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition ${
+              activeSubTab === "orders_fraud"
+                ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-zinc-100"
+                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+            }`}
+          >
+            <ShieldAlert size={14} className="text-red-500" />
+            <span>{locale === "ar" ? "الطلبات المزيفة" : "Anti-fraude"}</span>
           </button>
 
           <button
@@ -605,42 +623,11 @@ export function AdminSettingsView({
       )}
 
       {activeSubTab === "form" && (
-        <div className="max-w-3xl space-y-5" dir={locale === "ar" ? "rtl" : "ltr"}>
-          <section className="space-y-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-            <div>
-              <h2 className="font-bold">{locale === "ar" ? "إعدادات نموذج السلة" : "Formulaire du panier"}</h2>
-              <p className="mt-1 text-xs text-zinc-500">{locale === "ar" ? "التحكم في ظهور البريد والملاحظات والنص الإرشادي." : "Affichez ou masquez l’e-mail et les notes."}</p>
-            </div>
-            <label className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
-              <span>{locale === "ar" ? "إظهار البريد الإلكتروني في نموذج السلة" : "Afficher l’e-mail dans le panier"}</span>
-              <input type="checkbox" checked={storefront.checkout.showEmail} onChange={(event) => updateStorefront({ checkout: { ...storefront.checkout, showEmail: event.target.checked } })} />
-            </label>
-            <label className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
-              <span>{locale === "ar" ? "إظهار خانة ملاحظات الطلب" : "Afficher les notes de commande"}</span>
-              <input type="checkbox" checked={storefront.checkout.showNotes} onChange={(event) => updateStorefront({ checkout: { ...storefront.checkout, showNotes: event.target.checked } })} />
-            </label>
-            {(["ar", "fr"] as const).map((language) => (
-              <label key={language} className="block space-y-1 text-xs font-semibold">
-                <span>{locale === "ar" ? "النص الإرشادي لنموذج السلة" : "Texte du formulaire panier"} ({language === "ar" ? "العربية" : "Français"})</span>
-                <input dir={language === "ar" ? "rtl" : "ltr"} value={storefront.checkout.intro[language]} onChange={(event) => updateStorefront({ checkout: { ...storefront.checkout, intro: { ...storefront.checkout.intro, [language]: event.target.value } } })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
-              </label>
-            ))}
-          </section>
-          <section className="space-y-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="font-bold">{locale === "ar" ? "نموذج الطلب السريع في صفحة المنتج" : "Formulaire rapide de la page produit"}</h2>
-            <label className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
-              <span>{locale === "ar" ? "إظهار خانة العنوان" : "Afficher l’adresse"}</span>
-              <input type="checkbox" checked={storefront.productForm.showAddress} onChange={(event) => updateStorefront({ productForm: { ...storefront.productForm, showAddress: event.target.checked } })} />
-            </label>
-            {(["ar", "fr"] as const).map((language) => (
-              <label key={language} className="block space-y-1 text-xs font-semibold">
-                <span>{locale === "ar" ? "النص الإرشادي لصفحة المنتج" : "Texte de la page produit"} ({language === "ar" ? "العربية" : "Français"})</span>
-                <input dir={language === "ar" ? "rtl" : "ltr"} value={storefront.productForm.intro[language]} onChange={(event) => updateStorefront({ productForm: { ...storefront.productForm, intro: { ...storefront.productForm.intro, [language]: event.target.value } } })} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
-              </label>
-            ))}
-          </section>
-          <button type="button" disabled={savingShared} onClick={() => void saveShared()} className="flex items-center gap-2 rounded-lg bg-purple-700 px-5 py-3 text-xs font-bold text-white disabled:opacity-50"><Save size={14} />{locale === "ar" ? "حفظ إعدادات النماذج" : "Enregistrer les formulaires"}</button>
-        </div>
+        <AdminFormSettings />
+      )}
+
+      {activeSubTab === "orders_fraud" && (
+        <AdminOrdersSettings />
       )}
 
       {activeSubTab === "homepage" && (
