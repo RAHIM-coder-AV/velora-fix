@@ -25,6 +25,7 @@ import { ALGERIA_WILAYAS } from "@/lib/algeria-data";
 import { calculateOrderTotals, canEditOrder } from "@/lib/orders/order-editing";
 import { TrafficSourceBadge } from "@/components/admin/traffic-source-badge";
 import { getOrderTrafficSource } from "@/components/admin/admin-orders-table";
+import { DispatchErrorModal } from "@/components/admin/dispatch-error-modal";
 
 interface OrderDetailModalProps {
   order: Order | null;
@@ -55,6 +56,7 @@ export function OrderDetailModal({
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState("");
   const [editedOrder, setEditedOrder] = useState<Order | null>(null);
+  const [errorModal, setErrorModal] = useState<{ isOpen: boolean; message?: string; details?: string } | null>(null);
   const editFormRef = useRef<HTMLElement>(null);
   const [dispatchResult, setDispatchResult] = useState<{
     company: string;
@@ -74,11 +76,14 @@ export function OrderDetailModal({
     const companyLabel = company === "ecotrack" ? "EcoTrack" : "Nord Et Ouest";
 
     if (!cfg?.enabled || !cfg.token) {
-      toast(
-        locale === "ar"
-          ? `فعّل الربط وأدخل رمز API حقيقيًا لـ ${companyLabel} في الإعدادات أولاً.`
-          : `Activez l'intégration et configurez un vrai jeton API ${companyLabel}.`
-      );
+      setErrorModal({
+        isOpen: true,
+        message: locale === "ar" ? "حدث خطأ أثناء الإرسال" : "Une erreur est survenue lors de l'envoi.",
+        details:
+          locale === "ar"
+            ? `يرجى ضبط وتفعيل ربط ${companyLabel} في الإعدادات أولاً.`
+            : `Configurez et activez ${companyLabel} dans les paramètres d'abord.`,
+      });
       return;
     }
 
@@ -143,18 +148,24 @@ export function OrderDetailModal({
             : `Expédiée (${tracking}), mais la sauvegarde a échoué. Ne relancez pas l'envoi.`);
         }
       } else {
-        toast(
-          locale === "ar"
-            ? `❌ خطأ في الرفع: ${result?.error || data.error || "خطأ غير معروف"}`
-            : `❌ Erreur: ${result?.error || data.error}`
-        );
+        const errorMsg =
+          result?.error ||
+          data.error ||
+          (locale === "ar"
+            ? "تعذر إتمام الإرسال لدى شركة التوصيل."
+            : "Échec de l'envoi.");
+        setErrorModal({
+          isOpen: true,
+          message: locale === "ar" ? "حدث خطأ أثناء الإرسال" : "Une erreur est survenue lors de l'envoi.",
+          details: errorMsg,
+        });
       }
     } catch {
-      toast(
-        locale === "ar"
-          ? `فشل الاتصال بخادم ${companyLabel}`
-          : `Erreur de connexion avec ${companyLabel}`
-      );
+      setErrorModal({
+        isOpen: true,
+        message: locale === "ar" ? "حدث خطأ أثناء الإرسال" : "Une erreur est survenue lors de l'envoi.",
+        details: locale === "ar" ? `فشل الاتصال بخادم ${companyLabel}` : `Erreur de connexion avec ${companyLabel}`,
+      });
     } finally {
       setDispatching(null);
     }
@@ -753,6 +764,14 @@ export function OrderDetailModal({
           </div>
         </div>
       </div>
+
+      {/* Dispatch Error Modal */}
+      <DispatchErrorModal
+        isOpen={Boolean(errorModal?.isOpen)}
+        onClose={() => setErrorModal(null)}
+        message={errorModal?.message}
+        details={errorModal?.details}
+      />
     </div>
   );
 }

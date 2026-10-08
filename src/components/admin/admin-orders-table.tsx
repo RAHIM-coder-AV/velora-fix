@@ -36,6 +36,7 @@ import { useLocale } from "@/providers/locale-provider";
 import { formatPrice, timeAgo } from "@/lib/utils";
 import { OrderDetailModal } from "@/components/admin/order-detail-modal";
 import { TrafficSourceBadge } from "@/components/admin/traffic-source-badge";
+import { DispatchErrorModal } from "@/components/admin/dispatch-error-modal";
 import { openCustomerWhatsApp } from "@/lib/notifications/order-notifier";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -82,6 +83,7 @@ export function AdminOrdersTable({
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [bulkDispatching, setBulkDispatching] = useState<"ecotrack" | "nord_ouest" | null>(null);
   const [singleDispatching, setSingleDispatching] = useState<string | null>(null);
+  const [errorModal, setErrorModal] = useState<{ isOpen: boolean; message?: string; details?: string } | null>(null);
   const dispatchingOrderIds = useRef(new Set<string>());
   
   // Floating dropdown state (fixed position attached to viewport to avoid table overflow clipping)
@@ -310,11 +312,14 @@ export function AdminOrdersTable({
     const label = company === "ecotrack" ? "EcoTrack" : "Nord Et Ouest";
 
     if (!cfg?.enabled || !cfg.token) {
-      toast(
-        locale === "ar"
-          ? `يرجى ضبط وتفعيل ربط ${label} في الإعدادات أولاً.`
-          : `Configurez et activez ${label} dans les paramètres d'abord.`
-      );
+      setErrorModal({
+        isOpen: true,
+        message: locale === "ar" ? "حدث خطأ أثناء الإرسال" : "Une erreur est survenue lors de l'envoi.",
+        details:
+          locale === "ar"
+            ? `يرجى ضبط وتفعيل ربط ${label} في الإعدادات أولاً.`
+            : `Configurez et activez ${label} dans les paramètres d'abord.`,
+      });
       return;
     }
 
@@ -377,14 +382,24 @@ export function AdminOrdersTable({
           );
         }
       } else {
-        toast(
-          locale === "ar"
-            ? `❌ فشل الرفع: ${result?.error || data.error || "خطأ غير معروف"}`
-            : `❌ Erreur : ${result?.error || data.error}`
-        );
+        const errorMsg =
+          result?.error ||
+          data.error ||
+          (locale === "ar"
+            ? "تعذر إتمام الإرسال لدى شركة التوصيل."
+            : "Échec de l'envoi.");
+        setErrorModal({
+          isOpen: true,
+          message: locale === "ar" ? "حدث خطأ أثناء الإرسال" : "Une erreur est survenue lors de l'envoi.",
+          details: errorMsg,
+        });
       }
     } catch {
-      toast(locale === "ar" ? `فشل الاتصال بخادم ${label}` : `Erreur de connexion ${label}`);
+      setErrorModal({
+        isOpen: true,
+        message: locale === "ar" ? "حدث خطأ أثناء الإرسال" : "Une erreur est survenue lors de l'envoi.",
+        details: locale === "ar" ? `فشل الاتصال بخادم ${label}` : `Erreur de connexion ${label}`,
+      });
     } finally {
       setSingleDispatching(null);
     }
@@ -396,11 +411,14 @@ export function AdminOrdersTable({
     const label = company === "ecotrack" ? "EcoTrack" : "Nord Et Ouest";
 
     if (!cfg?.enabled || !cfg.token) {
-      toast(
-        locale === "ar"
-          ? `يرجى ضبط وتفعيل ربط ${label} في الإعدادات أولاً.`
-          : `Configurez et activez ${label} dans les paramètres d'abord.`
-      );
+      setErrorModal({
+        isOpen: true,
+        message: locale === "ar" ? "حدث خطأ أثناء الإرسال" : "Une erreur est survenue lors de l'envoi.",
+        details:
+          locale === "ar"
+            ? `يرجى ضبط وتفعيل ربط ${label} في الإعدادات أولاً.`
+            : `Configurez et activez ${label} dans les paramètres d'abord.`,
+      });
       return;
     }
 
@@ -472,14 +490,27 @@ export function AdminOrdersTable({
         }
       }
 
-      toast(
-        locale === "ar"
-          ? `تم إنشاء ${successCount} شحنة لدى ${label}${failCount > 0 ? ` — فشل رفع ${failCount} طلب` : ""}${persistenceFailureCount > 0 ? ` — تعذر حفظ بيانات ${persistenceFailureCount} شحنة؛ لا تعاود رفعها` : ""}.`
-          : `${successCount} envoi(s) créé(s) par ${label}${failCount > 0 ? ` — ${failCount} échec(s)` : ""}${persistenceFailureCount > 0 ? ` — sauvegarde impossible pour ${persistenceFailureCount}; ne relancez pas ces envois` : ""}.`
-      );
+      if (failCount > 0) {
+        const firstErr = results.find((r) => !r.success && r.error)?.error;
+        setErrorModal({
+          isOpen: true,
+          message: locale === "ar" ? "حدث خطأ أثناء الإرسال" : "Une erreur est survenue lors de l'envoi.",
+          details: firstErr || (locale === "ar" ? `فشل إرسال ${failCount} طلب إلى ${label}.` : `Échec de l'envoi de ${failCount} commande(s).`),
+        });
+      } else {
+        toast(
+          locale === "ar"
+            ? `تم إنشاء ${successCount} شحنة بنجاح لدى ${label}.`
+            : `${successCount} envoi(s) créé(s) par ${label}.`
+        );
+      }
       setSelectedOrderIds(failedOrderIds);
     } catch {
-      toast(locale === "ar" ? `فشل الاتصال بخادم ${label}` : `Erreur de connexion ${label}`);
+      setErrorModal({
+        isOpen: true,
+        message: locale === "ar" ? "حدث خطأ أثناء الإرسال" : "Une erreur est survenue lors de l'envoi.",
+        details: locale === "ar" ? `فشل الاتصال بخادم ${label}` : `Erreur de connexion ${label}`,
+      });
     } finally {
       setBulkDispatching(null);
     }
@@ -1241,6 +1272,14 @@ export function AdminOrdersTable({
           onOrderSaved={setSelectedOrder}
         />
       )}
+
+      {/* Dispatch Error Modal */}
+      <DispatchErrorModal
+        isOpen={Boolean(errorModal?.isOpen)}
+        onClose={() => setErrorModal(null)}
+        message={errorModal?.message}
+        details={errorModal?.details}
+      />
     </div>
   );
 }
