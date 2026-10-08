@@ -563,21 +563,7 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     }));
   },
   upsertProduct: async (product) => {
-    const client = sb();
-    if (client) {
-      if (isPersistedProductId(product.id)) {
-        await db.upsertProduct(client, product);
-      } else {
-        const inserted = await db.insertProductIfMissing(client, product);
-        if (!inserted) {
-          throw new Error(
-            "A product with this URL already exists. Reload the catalog and edit the saved product instead of replacing it with a local copy.",
-          );
-        }
-      }
-      await get().refresh();
-      return;
-    }
+    // 1. Always save locally immediately so user edits are never lost
     const current = get().products;
     const exists = current.some((p) => p.id === product.id);
     const updated = exists
@@ -585,6 +571,34 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
       : [product, ...current];
     set({ products: updated });
     saveProducts(updated);
+
+    // 2. Sync to Supabase if connected
+    const client = sb();
+    if (client) {
+      try {
+        if (isPersistedProductId(product.id)) {
+          await db.upsertProduct(client, product);
+        } else {
+          const inserted = await db.insertProductIfMissing(client, product);
+          if (!inserted) {
+            throw new Error(
+              "A product with this URL already exists. Reload the catalog and edit the saved product instead of replacing it with a local copy.",
+            );
+          }
+        }
+        void get().refresh().catch(() => {});
+      } catch (err: unknown) {
+        console.warn("Supabase upsert warning:", err);
+        const errMsg = String((err as { message?: string })?.message || "").toLowerCase();
+        const errCode = (err as { code?: string })?.code;
+        // If it's a database statement timeout, changes are already safely stored locally
+        if (errMsg.includes("timeout") || errMsg.includes("statement") || errCode === "57014") {
+          console.info("Product changes saved to local storage (database timed out).");
+          return;
+        }
+        throw err;
+      }
+    }
   },
   importLocalProducts: async () => {
     const client = sb();
