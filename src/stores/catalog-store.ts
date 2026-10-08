@@ -400,6 +400,7 @@ interface CatalogState {
     }
   ) => Promise<void>;
   setVariantStock: (productId: string, variantId: string, stock: number) => Promise<void>;
+  recordProductView: (productId: string) => Promise<void>;
   listProducts: (filters?: Filters) => Product[];
   getProduct: (slug: string) => Product | undefined;
 }
@@ -759,6 +760,14 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
               v.id === variantId ? { ...v, stock: Math.max(0, stock) } : v
             ),
           }
+    );
+    set({ products: updated });
+    saveProducts(updated);
+  },
+  recordProductView: async (productId: string) => {
+    const products = get().products;
+    const updated = products.map((p) =>
+      p.id === productId ? { ...p, views: (p.views ?? 0) + 1 } : p
     );
     set({ products: updated });
     saveProducts(updated);

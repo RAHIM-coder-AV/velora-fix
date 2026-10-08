@@ -59,12 +59,7 @@ interface FloatingDropdownState {
 }
 
 export function getOrderTrafficSource(order: Order): TrafficSource {
-  if (order.trafficSource) return order.trafficSource;
-  // If not explicitly set, deterministically distribute based on order id/reference
-  const key = order.reference || order.id;
-  const hash = key.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const sources: TrafficSource[] = ["meta", "tiktok", "meta", "tiktok", "snapchat", "meta"];
-  return sources[hash % sources.length];
+  return order.trafficSource || "direct";
 }
 
 function getPageNumbers(current: number, total: number): (number | "...")[] {
@@ -206,7 +201,9 @@ export function AdminOrdersTable({
 
     const source = getOrderTrafficSource(o).toLowerCase();
     let matchesSource = true;
-    if (sourceFilter === "meta") {
+    if (sourceFilter === "direct") {
+      matchesSource = source === "direct" || !source;
+    } else if (sourceFilter === "meta") {
       matchesSource = source.includes("meta") || source.includes("facebook") || source.includes("instagram") || source === "fb" || source === "ig";
     } else if (sourceFilter === "tiktok") {
       matchesSource = source.includes("tiktok") || source.includes("tt");
@@ -719,6 +716,7 @@ export function AdminOrdersTable({
             </span>
             {[
               { id: "all", label: locale === "ar" ? "الكل" : "Tous", icon: null },
+              { id: "direct", label: locale === "ar" ? "مباشر" : "Direct", icon: "direct" as const },
               { id: "meta", label: "Meta Ads", icon: "meta" as const },
               { id: "tiktok", label: "TikTok Ads", icon: "tiktok" as const },
               { id: "snapchat", label: "Snapchat Ads", icon: "snapchat" as const },
@@ -729,6 +727,7 @@ export function AdminOrdersTable({
                 ? orders.length
                 : orders.filter((o) => {
                     const s = getOrderTrafficSource(o).toLowerCase();
+                    if (src.id === "direct") return s === "direct" || !s;
                     if (src.id === "meta") return s.includes("meta") || s.includes("facebook") || s.includes("instagram") || s === "fb" || s === "ig";
                     if (src.id === "tiktok") return s.includes("tiktok") || s.includes("tt");
                     if (src.id === "snapchat") return s.includes("snap") || s.includes("sc");

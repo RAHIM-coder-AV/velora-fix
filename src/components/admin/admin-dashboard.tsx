@@ -247,45 +247,26 @@ export function AdminDashboard({
   const number = (value: number) =>
     new Intl.NumberFormat(locale === "ar" ? "ar-DZ" : "fr-DZ").format(value);
 
-  // Fallback demo data if catalog is empty, to give the exact look and feel
+  // Top viewed products based on actual recorded visits
   const displayTopProducts = useMemo(() => {
-    if (analytics.topViewedProducts && analytics.topViewedProducts.length > 0 && analytics.totalViews > 0) {
+    if (analytics.topViewedProducts && analytics.topViewedProducts.length > 0) {
       return analytics.topViewedProducts.map((p) => ({
         ...p,
         image: getImageUrl(p.image),
       }));
     }
-    if (analytics.bestProducts.length > 0) {
-      return analytics.bestProducts.map((p) => ({
-        id: p.id,
-        name: p.name,
-        image: getImageUrl(p.image),
-        views: p.units * 300 + 5000,
-        percent: p.percent,
-      }));
-    }
-    if (products.length > 0) {
-      return products.slice(0, 5).map((p, idx) => ({
-        id: p.id,
-        name: p.name,
-        image: getImageUrl(p.images[0]),
-        views: 100000 - idx * 15000,
-        percent: [21.4, 18.4, 17.2, 11.0, 6.0][idx] || 5.0,
-      }));
-    }
-    return [
-      { id: "1", name: { ar: "Ensemble", fr: "Ensemble" }, image: "", views: 109865, percent: 21.4 },
-      { id: "2", name: { ar: "orthopedique hl...", fr: "orthopedique hl..." }, image: "", views: 94853, percent: 18.4 },
-      { id: "3", name: { ar: "bligha", fr: "bligha" }, image: "", views: 88552, percent: 17.2 },
-      { id: "4", name: { ar: "Brosses à dents é...", fr: "Brosses à dents é..." }, image: "", views: 56330, percent: 11.0 },
-      { id: "5", name: { ar: "BIRKENSTOCK", fr: "BIRKENSTOCK" }, image: "", views: 30800, percent: 6.0 },
-    ];
+    return products.slice(0, 5).map((p) => ({
+      id: p.id,
+      name: p.name,
+      image: getImageUrl(p.images[0]),
+      views: p.views ?? 0,
+      percent: analytics.totalViews > 0 ? Math.round(((p.views ?? 0) / analytics.totalViews) * 1000) / 10 : 0,
+    }));
   }, [analytics, products]);
 
   const totalViewsFormatted = useMemo(() => {
-    const sum = displayTopProducts.reduce((s, p) => s + p.views, 0);
-    return number(sum > 0 ? sum : 514401);
-  }, [displayTopProducts, number]);
+    return number(analytics.totalViews || 0);
+  }, [analytics.totalViews, number]);
 
   const displayBestProductsDetailed = useMemo(() => {
     if (analytics.bestProductsDetailed.length > 0) {

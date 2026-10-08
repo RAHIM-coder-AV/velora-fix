@@ -410,7 +410,7 @@ export function AdminProductsTable({
 
                     {/* Views Count */}
                     <td className="py-3.5 px-3 font-mono text-zinc-500">
-                      {p.views ?? Math.floor(p.price * 1.5)}
+                      {p.views ?? 0}
                     </td>
 
                     {/* Active Toggle Switch (Matching Screenshot) */}

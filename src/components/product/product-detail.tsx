@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Heart, Sparkles, ShoppingBag } from "lucide-react";
 import type { Product, Review } from "@/types";
@@ -9,6 +9,7 @@ import { formatPrice } from "@/lib/utils";
 import { findVariant } from "@/lib/catalog/queries";
 import { useCartStore } from "@/stores/cart-store";
 import { useWishlistStore } from "@/stores/wishlist-store";
+import { useCatalogStore } from "@/stores/catalog-store";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { Button } from "@/components/ui/button";
 import { RatingStars } from "@/components/ui/rating-stars";
@@ -28,6 +29,16 @@ export function ProductDetail({
 }) {
   const { locale, dict } = useLocale();
   const [image, setImage] = useState(0);
+  const recordProductView = useCatalogStore((s) => s.recordProductView);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !product?.id) return;
+    const sessionKey = `velora_viewed_${product.id}`;
+    if (!sessionStorage.getItem(sessionKey)) {
+      sessionStorage.setItem(sessionKey, "1");
+      void recordProductView(product.id);
+    }
+  }, [product?.id, recordProductView]);
 
   // Available sizes (if tracking stock is enabled, only show stock > 0)
   const availableSizes = (() => {
