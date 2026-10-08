@@ -472,6 +472,169 @@ export function ProductEditModal({
                 </div>
               </div>
 
+              {/* Shipping Price Settings for this Product (أسعار وتكاليف التوصيل لهذا المنتج) */}
+              <div className="rounded-xl border border-purple-100 bg-purple-50/30 p-4 dark:border-purple-900/30 dark:bg-purple-950/20">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-purple-900 dark:text-purple-300">
+                      {locale === "ar" ? "سعر وتكاليف التوصيل لهذا المنتج" : "Frais de livraison pour ce produit"}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("shipping")}
+                    className="text-[11px] font-bold text-purple-700 underline hover:text-purple-900 dark:text-purple-400"
+                  >
+                    {locale === "ar" ? "إعدادات تفصيلية للتوصيل ←" : "Options détaillées →"}
+                  </button>
+                </div>
+
+                <div className="grid gap-2.5 sm:grid-cols-3">
+                  {/* Store price */}
+                  <label
+                    onClick={() =>
+                      setFormData((p) => ({
+                        ...p,
+                        shippingConfig: { ...(p.shippingConfig || { type: "store" }), type: "store" },
+                      }))
+                    }
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2.5 rounded-lg border p-3 text-xs transition",
+                      (formData.shippingConfig?.type || "store") === "store"
+                        ? "border-purple-600 bg-white font-bold text-purple-700 ring-2 ring-purple-500/20 shadow-xs dark:bg-zinc-800 dark:text-purple-300"
+                        : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="generalShippingType"
+                      checked={(formData.shippingConfig?.type || "store") === "store"}
+                      onChange={() =>
+                        setFormData((p) => ({
+                          ...p,
+                          shippingConfig: { ...(p.shippingConfig || { type: "store" }), type: "store" },
+                        }))
+                      }
+                      className="h-3.5 w-3.5 text-purple-600 focus:ring-purple-500"
+                    />
+                    <span>{locale === "ar" ? "سعر المتجر (الافتراضي)" : "Tarif boutique"}</span>
+                  </label>
+
+                  {/* Fixed price */}
+                  <label
+                    onClick={() =>
+                      setFormData((p) => ({
+                        ...p,
+                        shippingConfig: { ...(p.shippingConfig || { type: "fixed" }), type: "fixed" },
+                      }))
+                    }
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2.5 rounded-lg border p-3 text-xs transition",
+                      formData.shippingConfig?.type === "fixed"
+                        ? "border-purple-600 bg-white font-bold text-purple-700 ring-2 ring-purple-500/20 shadow-xs dark:bg-zinc-800 dark:text-purple-300"
+                        : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="generalShippingType"
+                      checked={formData.shippingConfig?.type === "fixed"}
+                      onChange={() =>
+                        setFormData((p) => ({
+                          ...p,
+                          shippingConfig: { ...(p.shippingConfig || { type: "fixed" }), type: "fixed" },
+                        }))
+                      }
+                      className="h-3.5 w-3.5 text-purple-600 focus:ring-purple-500"
+                    />
+                    <span>{locale === "ar" ? "سعر ثابت لكل الولايات" : "Tarif fixe"}</span>
+                  </label>
+
+                  {/* Free shipping */}
+                  <label
+                    onClick={() =>
+                      setFormData((p) => ({
+                        ...p,
+                        shippingConfig: { ...(p.shippingConfig || { type: "free" }), type: "free" },
+                      }))
+                    }
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2.5 rounded-lg border p-3 text-xs transition",
+                      formData.shippingConfig?.type === "free"
+                        ? "border-emerald-600 bg-white font-bold text-emerald-700 ring-2 ring-emerald-500/20 shadow-xs dark:bg-zinc-800 dark:text-emerald-300"
+                        : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="generalShippingType"
+                      checked={formData.shippingConfig?.type === "free"}
+                      onChange={() =>
+                        setFormData((p) => ({
+                          ...p,
+                          shippingConfig: { ...(p.shippingConfig || { type: "free" }), type: "free" },
+                        }))
+                      }
+                      className="h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                      {locale === "ar" ? "توصيل مجاني (0 دج)" : "Livraison gratuite"}
+                    </span>
+                  </label>
+                </div>
+
+                {/* If Fixed is selected, show immediate inputs */}
+                {formData.shippingConfig?.type === "fixed" && (
+                  <div className="mt-3 grid gap-3 border-t border-purple-200/60 pt-3 sm:grid-cols-2 dark:border-purple-900/40">
+                    <div>
+                      <label className="mb-1 block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                        {locale === "ar" ? "سعر التوصيل للمنزل (د.ج)" : "Prix livraison domicile (DZD)"}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="600"
+                        value={formData.shippingConfig?.fixedHomePrice ?? ""}
+                        onChange={(e) =>
+                          setFormData((p) => ({
+                            ...p,
+                            shippingConfig: {
+                              ...(p.shippingConfig || { type: "fixed" }),
+                              type: "fixed",
+                              fixedHomePrice: Number(e.target.value) || 0,
+                            },
+                          }))
+                        }
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                        {locale === "ar" ? "سعر التوصيل للمكتب / نقطة الاستلام (د.ج)" : "Prix livraison bureau (DZD)"}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="400"
+                        value={formData.shippingConfig?.fixedDeskPrice ?? ""}
+                        onChange={(e) =>
+                          setFormData((p) => ({
+                            ...p,
+                            shippingConfig: {
+                              ...(p.shippingConfig || { type: "fixed" }),
+                              type: "fixed",
+                              fixedDeskPrice: Number(e.target.value) || 0,
+                            },
+                          }))
+                        }
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs font-bold text-zinc-700 dark:text-zinc-300">
