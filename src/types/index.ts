@@ -91,6 +91,7 @@ export interface Product {
   offers?: ProductOffer[];
   shippingConfig?: ProductShippingConfig;
   trackStock?: boolean;
+  landingImages?: string[];
   active?: boolean;
   views?: number;
   featured: boolean;

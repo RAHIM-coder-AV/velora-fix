@@ -58,6 +58,7 @@ export function ProductEditModal({
   });
 
   const [newImageUrl, setNewImageUrl] = useState("");
+  const [newLandingImageUrl, setNewLandingImageUrl] = useState("");
   const [newSize, setNewSize] = useState("");
   const [newColor, setNewColor] = useState({ ar: "", fr: "", hex: "#111111" });
   const [optionsError, setOptionsError] = useState("");
@@ -196,6 +197,38 @@ export function ProductEditModal({
       const [selected] = imgs.splice(index, 1);
       return { ...prev, images: [selected, ...imgs] };
     });
+  }
+
+  function handleLandingImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const url = event.target?.result as string;
+      if (url) {
+        setFormData((prev) => ({
+          ...prev,
+          landingImages: [...(prev.landingImages || []), url],
+        }));
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleAddLandingImageUrl() {
+    if (!newLandingImageUrl.trim()) return;
+    setFormData((prev) => ({
+      ...prev,
+      landingImages: [...(prev.landingImages || []), newLandingImageUrl.trim()],
+    }));
+    setNewLandingImageUrl("");
+  }
+
+  function handleRemoveLandingImage(index: number) {
+    setFormData((prev) => ({
+      ...prev,
+      landingImages: (prev.landingImages || []).filter((_, i) => i !== index),
+    }));
   }
 
   function handleAddOffer() {
@@ -470,22 +503,110 @@ export function ProductEditModal({
                 </div>
               </div>
 
-              {/* Description */}
-              <div>
-                <label className="mb-1 block text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                  {locale === "ar" ? "وصف المنتج" : "Description"}
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.description.ar}
-                  onChange={(e) =>
-                    setFormData((p) => ({
-                      ...p,
-                      description: { ...p.description, ar: e.target.value },
-                    }))
-                  }
-                  className="w-full rounded-lg border border-zinc-300 bg-zinc-50 p-3 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-800"
-                />
+              {/* Description & Landing Page Section (وصف المنتج وصور صفحة الهبوط) */}
+              <div className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-800/40">
+                <div>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                      {locale === "ar" ? "وصف قصير للمنتج" : "Description courte"}
+                    </label>
+                    <span className="text-[10px] text-zinc-400 font-medium">
+                      {locale === "ar" ? "يظهر في كرت المنتج" : "Affiché avec le produit"}
+                    </span>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={formData.description.ar}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        description: { ...p.description, ar: e.target.value },
+                      }))
+                    }
+                    placeholder={locale === "ar" ? "اكتب نبذة تعريفية أو وصفاً للمنتج..." : "Description du produit..."}
+                    className="w-full rounded-lg border border-zinc-300 bg-white p-3 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-800"
+                  />
+                </div>
+
+                {/* Landing Page Images (صور صفحة الهبوط) */}
+                <div className="border-t border-zinc-200 pt-3 dark:border-zinc-700">
+                  <div className="mb-2.5 flex items-center justify-between gap-2">
+                    <div>
+                      <label className="flex items-center gap-1.5 text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                        <ImageIcon size={15} className="text-purple-600" />
+                        <span>{locale === "ar" ? "صور صفحة الهبوط للمنتج (Landing Page)" : "Images de la Landing Page"}</span>
+                      </label>
+                      <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                        {locale === "ar"
+                          ? "أضف صوراً توضيحية أو إعلانية عالية الدقة تظهر كصفحة هبوط تسويقية مخصصة للمنتج لزيادة نسبة المبيعات."
+                          : "Ajoutez des visuels grand format qui s'affichent comme page de vente pour maximiser les conversions."}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950/50 dark:text-purple-300">
+                      {(formData.landingImages?.length || 0)} {locale === "ar" ? "صور" : "images"}
+                    </span>
+                  </div>
+
+                  {/* Upload & Add URL controls */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-purple-700">
+                      <Upload size={14} />
+                      <span>{locale === "ar" ? "رفع صورة من جهازك" : "Téléverser une image"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLandingImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+
+                    <div className="flex flex-1 items-center gap-2">
+                      <input
+                        type="url"
+                        placeholder={locale === "ar" ? "أو ضع رابط صورة صفحة الهبوط مباشرة (URL)" : "Ou collez le lien de l'image (URL)"}
+                        value={newLandingImageUrl}
+                        onChange={(e) => setNewLandingImageUrl(e.target.value)}
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-800"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddLandingImageUrl}
+                        className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+                      >
+                        {locale === "ar" ? "إضافة" : "Ajouter"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Preview List of Landing Images */}
+                  {(formData.landingImages && formData.landingImages.length > 0) ? (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {formData.landingImages.map((url, idx) => (
+                        <div
+                          key={idx}
+                          className="group relative overflow-hidden rounded-xl border border-zinc-200 bg-white p-2 shadow-xs dark:border-zinc-700 dark:bg-zinc-800"
+                        >
+                          <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-900">
+                            <Image src={url} alt={`Landing ${idx + 1}`} fill className="object-cover" />
+                          </div>
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+                              {locale === "ar" ? `صورة صفحة الهبوط #${idx + 1}` : `Image #${idx + 1}`}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveLandingImage(idx)}
+                              className="rounded-md p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                              title={locale === "ar" ? "حذف الصورة" : "Supprimer"}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           )}

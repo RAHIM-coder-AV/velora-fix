@@ -249,6 +249,35 @@ export function ProductDetail({
         </div>
       </div>
 
+      {/* Product Landing Page Presentation (صفحة هبوط المنتج الترويجية) */}
+      {product.landingImages && product.landingImages.length > 0 && (
+        <section className="mt-14 space-y-6">
+          <div className="flex items-center justify-center gap-3 text-center">
+            <span className="h-px w-16 bg-gradient-to-r from-transparent to-zinc-300 dark:to-zinc-700" />
+            <h2 className="font-serif text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+              {locale === "ar" ? "تفاصيل ومميزات المنتج" : "Détails & Présentation"}
+            </h2>
+            <span className="h-px w-16 bg-gradient-to-l from-transparent to-zinc-300 dark:to-zinc-700" />
+          </div>
+
+          <div className="mx-auto max-w-4xl space-y-4">
+            {product.landingImages.map((imgUrl, index) => (
+              <div
+                key={index}
+                className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+              >
+                <img
+                  src={imgUrl}
+                  alt={`${product.name[locale] || product.name.ar} - Landing visual ${index + 1}`}
+                  className="w-full h-auto object-contain"
+                  loading={index === 0 ? "eager" : "lazy"}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Reviews Section */}
       <section className="mt-16 border-t border-zinc-200 pt-10 dark:border-zinc-800">
         <h2 className="font-serif text-2xl font-bold">{dict.product.reviews}</h2>
