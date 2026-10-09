@@ -294,20 +294,20 @@ const initialOrders: Order[] = [
   },
 ];
 
-function getStoredProducts(): Product[] {
-  if (typeof window === "undefined") return [];
+export function getStoredProducts(): Product[] {
+  if (typeof window === "undefined") return seedProducts;
   try {
     const saved = localStorage.getItem("velora_products");
     if (saved) {
       const parsed = JSON.parse(saved) as Product[];
-      if (Array.isArray(parsed)) {
-        return removeSeedProducts(parsed, seedProducts);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
       }
     }
   } catch {
     // ignore
   }
-  return [];
+  return seedProducts;
 }
 
 function getStoredOrders(): Order[] {
@@ -414,20 +414,19 @@ export interface ImportLocalProductsResult {
 const sb = () => (isSupabaseConfigured() ? createClient() : null);
 
 export const useCatalogStore = create<CatalogState>()((set, get) => ({
-  // Server and client must render identical markup on the first pass, so no
-  // browser storage is read during store creation. Local data is loaded in
-  // hydrateLocalData(), which runs from an effect after hydration.
-  products: [],
+  // Seed products available instantly so client & server render immediately with 0 delay
+  products: seedProducts,
   categories: seedCategories,
-  catalogLoadState: isSupabaseConfigured() ? "loading" : "ready",
-  orders: [],
+  catalogLoadState: "ready",
+  orders: initialOrders,
   abandonedCheckouts: [],
   reviews: seedReviews,
-  localDataReady: false,
+  localDataReady: true,
   hydrateLocalData: () => {
     if (typeof window === "undefined") return;
+    const stored = getStoredProducts();
     set((state) => ({
-      products: state.products.length ? state.products : getStoredProducts(),
+      products: stored.length ? stored : (state.products.length ? state.products : seedProducts),
       orders: state.orders.length ? state.orders : getStoredOrders(),
       abandonedCheckouts: state.abandonedCheckouts.length
         ? state.abandonedCheckouts

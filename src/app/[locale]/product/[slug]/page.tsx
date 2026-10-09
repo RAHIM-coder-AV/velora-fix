@@ -2,9 +2,10 @@
 
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useCatalogStore } from "@/stores/catalog-store";
+import { useCatalogStore, getStoredProducts } from "@/stores/catalog-store";
 import { useLocale } from "@/providers/locale-provider";
 import { relatedProducts } from "@/lib/catalog/queries";
+import { products as seedProducts } from "@/lib/catalog/seed";
 import { ProductDetail } from "@/components/product/product-detail";
 import { Container } from "@/components/ui/container";
 
@@ -43,7 +44,14 @@ export default function ProductPage() {
   const catalogLoadState = useCatalogStore((s) => s.catalogLoadState);
   const localDataReady = useCatalogStore((s) => s.localDataReady);
   const allReviews = useCatalogStore((s) => s.reviews);
-  const product = products.find((p) => p.slug === params.slug || p.id === params.slug);
+
+  // Fast direct resolution: store -> localStorage -> seed
+  const product =
+    products.find((p) => p.slug === params.slug || p.id === params.slug) ||
+    (typeof window !== "undefined"
+      ? getStoredProducts().find((p) => p.slug === params.slug || p.id === params.slug)
+      : undefined) ||
+    seedProducts.find((p) => p.slug === params.slug || p.id === params.slug);
 
   useEffect(() => {
     // Prefetch checkout success page for instant redirect upon order placement
