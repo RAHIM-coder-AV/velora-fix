@@ -266,14 +266,32 @@ export function ProductDetail({
                 key={index}
                 className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={imgUrl}
                   alt={`${product.name[locale] || product.name.ar} - Landing visual ${index + 1}`}
-                  className="w-full h-auto object-contain"
+                  className="w-full h-auto object-contain block"
                   loading={index === 0 ? "eager" : "lazy"}
                 />
               </div>
             ))}
+
+            {/* Bottom CTA to jump to order form */}
+            <div className="pt-4 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById("quick-order-form");
+                  if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }
+                }}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-8 py-3.5 text-sm sm:text-base font-bold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-700 active:scale-95"
+              >
+                <ShoppingBag size={18} />
+                <span>{locale === "ar" ? "اطلب الآن (الدفع عند الاستلام)" : "Commander maintenant"}</span>
+              </button>
+            </div>
           </div>
         </section>
       )}

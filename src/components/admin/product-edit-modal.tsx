@@ -1,8 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
-import { X, Plus, Trash2, Check, Upload, Tag, DollarSign, Image as ImageIcon, Layers, Palette, Truck } from "lucide-react";
+import {
+  X,
+  Plus,
+  Trash2,
+  Check,
+  Upload,
+  Tag,
+  DollarSign,
+  Image as ImageIcon,
+  Layers,
+  Palette,
+  Truck,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 import type { Product, ProductOffer, Category } from "@/types";
 import { useLocale } from "@/providers/locale-provider";
 import { uid } from "@/lib/utils";
@@ -18,6 +32,46 @@ interface ProductEditModalProps {
   onSave: (updated: Product) => Promise<void>;
 }
 
+// Client-side canvas image compression to keep images sharp while keeping base64 under size limits
+function compressImageFile(file: File, maxDimension = 1400, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (readerEvent) => {
+      const img = document.createElement("img");
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(readerEvent.target?.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => resolve(readerEvent.target?.result as string);
+      img.src = readerEvent.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export function ProductEditModal({
   product,
   categories,
@@ -28,8 +82,8 @@ export function ProductEditModal({
   const { locale } = useLocale();
   const [activeTab, setActiveTab] = useState<"general" | "options" | "offers" | "images" | "shipping">("general");
 
-  // Local form state
-  const [formData, setFormData] = useState<Product>({
+  // Local form state initialized
+  const [formData, setFormData] = useState<Product>(() => ({
     ...product,
     trackStock: product.trackStock !== undefined ? product.trackStock : true,
     shippingConfig: product.shippingConfig || {
@@ -37,6 +91,7 @@ export function ProductEditModal({
       fixedHomePrice: 0,
       fixedDeskPrice: 0,
     },
+    landingImages: product.landingImages || [],
     variants: reconcileProductVariants(product.variants, product.sizes, product.colors),
     offers: product.offers || [
       {
@@ -55,7 +110,45 @@ export function ProductEditModal({
         badge: { ar: "الأكثر طلباً", fr: "Populaire" },
       },
     ],
-  });
+  }));
+
+  // Re-sync form state whenever the product prop or isOpen changes
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        ...product,
+        trackStock: product.trackStock !== undefined ? product.trackStock : true,
+        shippingConfig: product.shippingConfig || {
+          type: "store",
+          fixedHomePrice: 0,
+          fixedDeskPrice: 0,
+        },
+        landingImages: product.landingImages || [],
+        variants: reconcileProductVariants(product.variants, product.sizes, product.colors),
+        offers: product.offers || [
+          {
+            id: uid("off"),
+            quantity: 1,
+            title: { ar: "قطعة واحدة", fr: "1 pièce" },
+            price: product.price,
+            originalPrice: product.compareAtPrice,
+          },
+          {
+            id: uid("off"),
+            quantity: 2,
+            title: { ar: "2 قطع", fr: "2 pièces" },
+            price: Math.round(product.price * 1.8),
+            originalPrice: (product.compareAtPrice || product.price) * 2,
+            badge: { ar: "الأكثر طلباً", fr: "Populaire" },
+          },
+        ],
+      });
+      setNewImageUrl("");
+      setNewLandingImageUrl("");
+      setOptionsError("");
+      setSaveError("");
+    }
+  }, [product, isOpen]);
 
   const [newImageUrl, setNewImageUrl] = useState("");
   const [newLandingImageUrl, setNewLandingImageUrl] = useState("");
@@ -64,6 +157,8 @@ export function ProductEditModal({
   const [optionsError, setOptionsError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploadingLanding, setUploadingLanding] = useState(false);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
 
   function updateProductOptions(sizes: string[], colors: Product["colors"]) {
     setFormData((prev) => ({
@@ -151,23 +246,35 @@ export function ProductEditModal({
 
   if (!isOpen) return null;
 
-  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const url = event.target?.result as string;
-      if (url) {
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploadingGallery(true);
+    try {
+      const newImages: Product["images"] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const compressedUrl = await compressImageFile(file, 1200, 0.85);
+        if (compressedUrl) {
+          newImages.push({
+            id: uid("img"),
+            url: compressedUrl,
+            alt: { ar: formData.name.ar, fr: formData.name.fr },
+          });
+        }
+      }
+      if (newImages.length > 0) {
         setFormData((prev) => ({
           ...prev,
-          images: [
-            ...prev.images,
-            { id: uid("img"), url, alt: { ar: prev.name.ar, fr: prev.name.fr } },
-          ],
+          images: [...prev.images, ...newImages],
         }));
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Failed to upload image", err);
+    } finally {
+      e.target.value = "";
+      setUploadingGallery(false);
+    }
   }
 
   function handleAddImageUrl() {
@@ -199,27 +306,40 @@ export function ProductEditModal({
     });
   }
 
-  function handleLandingImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const url = event.target?.result as string;
-      if (url) {
+  // --- Landing Page Images Handlers ---
+  async function handleLandingImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploadingLanding(true);
+    try {
+      const newUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const compressedUrl = await compressImageFile(file, 1400, 0.88);
+        if (compressedUrl) {
+          newUrls.push(compressedUrl);
+        }
+      }
+      if (newUrls.length > 0) {
         setFormData((prev) => ({
           ...prev,
-          landingImages: [...(prev.landingImages || []), url],
+          landingImages: [...(prev.landingImages || []), ...newUrls],
         }));
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Failed to upload landing images", err);
+    } finally {
+      e.target.value = "";
+      setUploadingLanding(false);
+    }
   }
 
   function handleAddLandingImageUrl() {
-    if (!newLandingImageUrl.trim()) return;
+    const url = newLandingImageUrl.trim();
+    if (!url) return;
     setFormData((prev) => ({
       ...prev,
-      landingImages: [...(prev.landingImages || []), newLandingImageUrl.trim()],
+      landingImages: [...(prev.landingImages || []), url],
     }));
     setNewLandingImageUrl("");
   }
@@ -229,6 +349,16 @@ export function ProductEditModal({
       ...prev,
       landingImages: (prev.landingImages || []).filter((_, i) => i !== index),
     }));
+  }
+
+  function handleMoveLandingImage(index: number, direction: "up" | "down") {
+    const list = [...(formData.landingImages || [])];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= list.length) return;
+    const temp = list[index];
+    list[index] = list[targetIndex];
+    list[targetIndex] = temp;
+    setFormData((prev) => ({ ...prev, landingImages: list }));
   }
 
   function handleAddOffer() {
@@ -338,7 +468,7 @@ export function ProductEditModal({
             )}
           >
             <ImageIcon size={15} />
-            {locale === "ar" ? "الصور" : "Photos"} ({formData.images.length})
+            {locale === "ar" ? "الصور وصفحة الهبوط" : "Photos & Landing Page"} ({formData.images.length + (formData.landingImages?.length || 0)})
           </button>
 
           <button
@@ -419,7 +549,7 @@ export function ProductEditModal({
                 </div>
               </div>
 
-              {/* Price Fields (User Request: تعديل السعر وقبل التخفيض) */}
+              {/* Price Fields */}
               <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-4 dark:border-purple-900/30 dark:bg-purple-950/20">
                 <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-purple-900 dark:text-purple-300">
                   {locale === "ar" ? "إعدادات الأسعار والتخفيض" : "Tarification"}
@@ -472,7 +602,7 @@ export function ProductEditModal({
                 </div>
               </div>
 
-              {/* Shipping Price Settings for this Product (أسعار وتكاليف التوصيل لهذا المنتج) */}
+              {/* Shipping Price Settings for this Product */}
               <div className="rounded-xl border border-purple-100 bg-purple-50/30 p-4 dark:border-purple-900/30 dark:bg-purple-950/20">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -584,7 +714,6 @@ export function ProductEditModal({
                   </label>
                 </div>
 
-                {/* If Fixed is selected, show immediate inputs */}
                 {formData.shippingConfig?.type === "fixed" && (
                   <div className="mt-3 grid gap-3 border-t border-purple-200/60 pt-3 sm:grid-cols-2 dark:border-purple-900/40">
                     <div>
@@ -666,7 +795,7 @@ export function ProductEditModal({
                 </div>
               </div>
 
-              {/* Description & Landing Page Section (وصف المنتج وصور صفحة الهبوط) */}
+              {/* Description & Landing Page Section */}
               <div className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-800/40">
                 <div>
                   <div className="mb-1 flex items-center justify-between gap-2">
@@ -701,23 +830,32 @@ export function ProductEditModal({
                       </label>
                       <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
                         {locale === "ar"
-                          ? "أضف صوراً توضيحية أو إعلانية عالية الدقة تظهر كصفحة هبوط تسويقية مخصصة للمنتج لزيادة نسبة المبيعات."
-                          : "Ajoutez des visuels grand format qui s'affichent comme page de vente pour maximiser les conversions."}
+                          ? "أضف صوراً إعلانية أو تفصيلية عالية الدقة تظهر كصفحة هبوط تسويقية مخصصة تحت المنتج لزيادة المبيعات."
+                          : "Ajoutez des visuels pleine largeur sous le formulaire pour booster vos ventes."}
                       </p>
                     </div>
-                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950/50 dark:text-purple-300">
+                    <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-[11px] font-bold text-purple-700 dark:bg-purple-950/50 dark:text-purple-300">
                       {(formData.landingImages?.length || 0)} {locale === "ar" ? "صور" : "images"}
                     </span>
                   </div>
 
                   {/* Upload & Add URL controls */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-purple-700">
+                    <label className={cn(
+                      "flex cursor-pointer items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-purple-700",
+                      uploadingLanding && "opacity-60 cursor-wait"
+                    )}>
                       <Upload size={14} />
-                      <span>{locale === "ar" ? "رفع صورة من جهازك" : "Téléverser une image"}</span>
+                      <span>
+                        {uploadingLanding
+                          ? locale === "ar" ? "جارٍ الرفع..." : "Téléversement..."
+                          : locale === "ar" ? "رفع صورة / صور من جهازك" : "Téléverser image(s)"}
+                      </span>
                       <input
                         type="file"
                         accept="image/*"
+                        multiple
+                        disabled={uploadingLanding}
                         onChange={handleLandingImageUpload}
                         className="hidden"
                       />
@@ -741,29 +879,52 @@ export function ProductEditModal({
                     </div>
                   </div>
 
-                  {/* Preview List of Landing Images */}
+                  {/* Preview List of Landing Images with Reorder & Remove */}
                   {(formData.landingImages && formData.landingImages.length > 0) ? (
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
                       {formData.landingImages.map((url, idx) => (
                         <div
                           key={idx}
-                          className="group relative overflow-hidden rounded-xl border border-zinc-200 bg-white p-2 shadow-xs dark:border-zinc-700 dark:bg-zinc-800"
+                          className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-zinc-200 bg-white p-2.5 shadow-xs dark:border-zinc-700 dark:bg-zinc-800"
                         >
                           <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-900">
-                            <Image src={url} alt={`Landing ${idx + 1}`} fill className="object-cover" />
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt={`Landing ${idx + 1}`} className="h-full w-full object-cover" />
                           </div>
-                          <div className="mt-2 flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
-                              {locale === "ar" ? `صورة صفحة الهبوط #${idx + 1}` : `Image #${idx + 1}`}
+                          <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-zinc-100 pt-2 dark:border-zinc-700/60">
+                            <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                              {locale === "ar" ? `صورة صفحة الهبوط #${idx + 1}` : `Image Landing #${idx + 1}`}
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveLandingImage(idx)}
-                              className="rounded-md p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                              title={locale === "ar" ? "حذف الصورة" : "Supprimer"}
-                            >
-                              <Trash2 size={15} />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              {idx > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveLandingImage(idx, "up")}
+                                  className="rounded p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                  title={locale === "ar" ? "تحريك لأعلى" : "Monter"}
+                                >
+                                  <ArrowUp size={13} />
+                                </button>
+                              )}
+                              {idx < formData.landingImages!.length - 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveLandingImage(idx, "down")}
+                                  className="rounded p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                  title={locale === "ar" ? "تحريك لأسفل" : "Descendre"}
+                                >
+                                  <ArrowDown size={13} />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveLandingImage(idx)}
+                                className="rounded p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                                title={locale === "ar" ? "حذف الصورة" : "Supprimer"}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -776,7 +937,7 @@ export function ProductEditModal({
 
           {activeTab === "options" && (
             <div className="space-y-6">
-              {/* Inventory Tracking Toggle (هل أعمل بنظام المخزون أم لا) */}
+              {/* Inventory Tracking Toggle */}
               <div className="flex items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/50">
                 <div className="flex items-start gap-3">
                   <div className={cn(
@@ -1016,45 +1177,66 @@ export function ProductEditModal({
             </div>
           )}
 
-          {/* TAB 2: Images Management (User Request: تعديل الصور) */}
+          {/* TAB 2: Images Management (Gallery + Landing Page) */}
           {activeTab === "images" && (
-            <div className="space-y-6">
-              {/* Upload & Add by URL */}
-              <div className="flex flex-wrap items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/40">
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-purple-600 px-4 py-2.5 text-xs font-bold text-white shadow transition hover:bg-purple-700">
-                  <Upload size={16} />
-                  <span>{locale === "ar" ? "رفع صورة من جهازك" : "Téléverser une image"}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                </label>
-
-                <div className="flex flex-1 items-center gap-2">
-                  <input
-                    type="url"
-                    placeholder={locale === "ar" ? "أو أدخل رابط صورة مباشرة (URL)" : "Ou collez un lien d'image"}
-                    value={newImageUrl}
-                    onChange={(e) => setNewImageUrl(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-800"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddImageUrl}
-                    className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
-                  >
-                    {locale === "ar" ? "إضافة" : "Ajouter"}
-                  </button>
+            <div className="space-y-8">
+              {/* Product Gallery Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                      {locale === "ar" ? "صور معرض المنتج (Gallery)" : "Galerie principale du produit"}
+                    </h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {locale === "ar" ? "الصور الأساسية التي تظهر في سلايدر المنتج أعلى الصفحة" : "Photos présentées dans le carrousel principal"}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                    {formData.images.length} {locale === "ar" ? "صور" : "photos"}
+                  </span>
                 </div>
-              </div>
 
-              {/* Grid of Current Images */}
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-zinc-500">
-                  {locale === "ar" ? "صور المنتج (انقر لتعيين الصورة الرئيسية)" : "Photos existantes"}
-                </p>
+                {/* Upload & Add by URL */}
+                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/40">
+                  <label className={cn(
+                    "flex cursor-pointer items-center gap-2 rounded-lg bg-purple-600 px-4 py-2.5 text-xs font-bold text-white shadow transition hover:bg-purple-700",
+                    uploadingGallery && "opacity-60 cursor-wait"
+                  )}>
+                    <Upload size={16} />
+                    <span>
+                      {uploadingGallery
+                        ? locale === "ar" ? "جارٍ الرفع..." : "Téléversement..."
+                        : locale === "ar" ? "رفع صورة من جهازك" : "Téléverser une image"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      disabled={uploadingGallery}
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+
+                  <div className="flex flex-1 items-center gap-2">
+                    <input
+                      type="url"
+                      placeholder={locale === "ar" ? "أو أدخل رابط صورة مباشرة (URL)" : "Ou collez un lien d'image"}
+                      value={newImageUrl}
+                      onChange={(e) => setNewImageUrl(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddImageUrl}
+                      className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+                    >
+                      {locale === "ar" ? "إضافة" : "Ajouter"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Grid of Current Images */}
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
                   {formData.images.map((img, idx) => (
                     <div
@@ -1066,7 +1248,8 @@ export function ProductEditModal({
                           : "border-zinc-200 dark:border-zinc-700"
                       )}
                     >
-                      <Image src={img.url} alt="" fill className="object-cover" sizes="150px" />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.url} alt="" className="h-full w-full object-cover" />
 
                       {/* Primary Badge */}
                       {idx === 0 && (
@@ -1100,10 +1283,123 @@ export function ProductEditModal({
                   ))}
                 </div>
               </div>
+
+              {/* Landing Page Images in Images Tab */}
+              <div className="space-y-4 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-purple-900 dark:text-purple-300">
+                      {locale === "ar" ? "صور صفحة الهبوط المخصصة (Landing Page Visuals)" : "Visuels Landing Page"}
+                    </h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {locale === "ar"
+                        ? "هذه الصور تعرض بكامل العرض كصفحة هبوط تسويقية أسفل تفاصيل المنتج"
+                        : "Images grand format affichées sous le formulaire de commande"}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-bold text-purple-700 dark:bg-purple-950/50 dark:text-purple-300">
+                    {(formData.landingImages?.length || 0)} {locale === "ar" ? "صور" : "images"}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-purple-100 bg-purple-50/40 p-3.5 dark:border-purple-900/30 dark:bg-purple-950/20">
+                  <label className={cn(
+                    "flex cursor-pointer items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-purple-700",
+                    uploadingLanding && "opacity-60 cursor-wait"
+                  )}>
+                    <Upload size={14} />
+                    <span>
+                      {uploadingLanding
+                        ? locale === "ar" ? "جارٍ الرفع..." : "Téléversement..."
+                        : locale === "ar" ? "رفع صور صفحة الهبوط" : "Téléverser visuel(s)"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      disabled={uploadingLanding}
+                      onChange={handleLandingImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+
+                  <div className="flex flex-1 items-center gap-2">
+                    <input
+                      type="url"
+                      placeholder={locale === "ar" ? "رابط صورة صفحة الهبوط (URL)..." : "Lien URL du visuel..."}
+                      value={newLandingImageUrl}
+                      onChange={(e) => setNewLandingImageUrl(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddLandingImageUrl}
+                      className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+                    >
+                      {locale === "ar" ? "إضافة" : "Ajouter"}
+                    </button>
+                  </div>
+                </div>
+
+                {(formData.landingImages && formData.landingImages.length > 0) ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {formData.landingImages.map((url, idx) => (
+                      <div
+                        key={idx}
+                        className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-zinc-200 bg-white p-2.5 shadow-xs dark:border-zinc-700 dark:bg-zinc-800"
+                      >
+                        <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-900">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt={`Landing ${idx + 1}`} className="h-full w-full object-cover" />
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2 border-t border-zinc-100 pt-2 dark:border-zinc-700/60">
+                          <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                            {locale === "ar" ? `صورة صفحة الهبوط #${idx + 1}` : `Visuel #${idx + 1}`}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            {idx > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleMoveLandingImage(idx, "up")}
+                                className="rounded p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                title={locale === "ar" ? "تحريك لأعلى" : "Monter"}
+                              >
+                                <ArrowUp size={13} />
+                              </button>
+                            )}
+                            {idx < formData.landingImages!.length - 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleMoveLandingImage(idx, "down")}
+                                className="rounded p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                title={locale === "ar" ? "تحريك لأسفل" : "Descendre"}
+                              >
+                                <ArrowDown size={13} />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveLandingImage(idx)}
+                              className="rounded p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                              title={locale === "ar" ? "حذف" : "Supprimer"}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center py-4 text-xs text-zinc-400">
+                    {locale === "ar" ? "لم تتم إضافة أي صور لصفحة الهبوط بعد." : "Aucun visuel de landing page."}
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
-          {/* TAB 3: Offers / Packs Management (User Request: تعديل العروض) */}
+          {/* TAB 3: Offers / Packs Management */}
           {activeTab === "offers" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">

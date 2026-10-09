@@ -381,7 +381,7 @@ export function QuickOrderForm({
   }
 
   return (
-    <div className="product-order-form min-w-0 rounded-xl border-2 border-emerald-500/30 bg-white p-3 shadow-xl sm:p-5 md:p-7 dark:bg-zinc-900">
+    <div id="quick-order-form" className="product-order-form min-w-0 rounded-xl border-2 border-emerald-500/30 bg-white p-3 shadow-xl sm:p-5 md:p-7 dark:bg-zinc-900">
       {/* Top Banner Notice */}
       <div className="mb-5 flex items-center justify-between rounded-lg bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
         <span className="flex items-center gap-1.5">
