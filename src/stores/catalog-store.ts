@@ -453,8 +453,11 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
       }));
       saveProducts(finalProducts);
     } catch (error) {
-      set({ catalogLoadState: "error" });
-      throw error;
+      console.warn("Could not sync catalog with database, continuing with local store:", error);
+      set((state) => ({
+        catalogLoadState: "ready",
+        products: state.products.length ? state.products : getStoredProducts(),
+      }));
     }
   },
   refreshOrders: async (all = false) => {
