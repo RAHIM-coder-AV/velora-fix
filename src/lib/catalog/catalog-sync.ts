@@ -10,11 +10,35 @@ export function mergeCatalogProducts(
   persistedProducts: Product[],
   cachedProducts: Product[],
 ): Product[] {
+  const cachedMap = new Map(cachedProducts.map((p) => [p.id, p]));
+  const cachedSlugMap = new Map(cachedProducts.map((p) => [p.slug, p]));
+
+  const mergedPersisted = persistedProducts.map((persisted) => {
+    const cached = cachedMap.get(persisted.id) || cachedSlugMap.get(persisted.slug);
+    if (!cached) return persisted;
+    return {
+      ...persisted,
+      // CRITICAL: Always preserve landing images, custom gallery images, and shipping config from local cache!
+      landingImages:
+        cached.landingImages && cached.landingImages.length > 0
+          ? cached.landingImages
+          : persisted.landingImages,
+      shippingConfig: cached.shippingConfig || persisted.shippingConfig,
+      trackStock: cached.trackStock !== undefined ? cached.trackStock : persisted.trackStock,
+      images:
+        cached.images && cached.images.length > 0
+          ? cached.images
+          : persisted.images,
+      offers: (cached.offers && cached.offers.length > 0) ? cached.offers : persisted.offers,
+      views: Math.max(persisted.views ?? 0, cached.views ?? 0),
+    };
+  });
+
   const persistedSlugs = new Set(persistedProducts.map((product) => product.slug));
   const cachedOnlyProducts = cachedProducts.filter(
     (product) => !isPersistedProductId(product.id) && !persistedSlugs.has(product.slug),
   );
-  return [...persistedProducts, ...cachedOnlyProducts];
+  return [...mergedPersisted, ...cachedOnlyProducts];
 }
 
 export function removeSeedProducts(products: Product[], seedProducts: Product[]): Product[] {

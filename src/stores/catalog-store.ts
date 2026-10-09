@@ -294,14 +294,44 @@ const initialOrders: Order[] = [
   },
 ];
 
+export function getStoredLandingImagesMap(): Record<string, string[]> {
+  if (typeof window === "undefined") return {};
+  try {
+    const saved = localStorage.getItem("velora_product_landing_images");
+    if (saved) return JSON.parse(saved) as Record<string, string[]>;
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
+export function saveLandingImagesMap(productId: string, slug: string, landingImages: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    const current = getStoredLandingImagesMap();
+    if (productId) current[productId] = landingImages;
+    if (slug) current[slug] = landingImages;
+    localStorage.setItem("velora_product_landing_images", JSON.stringify(current));
+  } catch (e) {
+    console.warn("Storage warning for landing images map:", e);
+  }
+}
+
 export function getStoredProducts(): Product[] {
   if (typeof window === "undefined") return seedProducts;
   try {
+    const landingMap = getStoredLandingImagesMap();
     const saved = localStorage.getItem("velora_products");
     if (saved) {
       const parsed = JSON.parse(saved) as Product[];
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        return parsed.map((p) => ({
+          ...p,
+          landingImages:
+            p.landingImages && p.landingImages.length > 0
+              ? p.landingImages
+              : landingMap[p.id] || landingMap[p.slug] || [],
+        }));
       }
     }
   } catch {
@@ -327,9 +357,20 @@ function getStoredOrders(): Order[] {
 function saveProducts(products: Product[]) {
   if (typeof window !== "undefined") {
     try {
+      const landingMap = getStoredLandingImagesMap();
+      for (const p of products) {
+        if (p.landingImages && p.landingImages.length > 0) {
+          if (p.id) landingMap[p.id] = p.landingImages;
+          if (p.slug) landingMap[p.slug] = p.landingImages;
+        }
+      }
+      try {
+        localStorage.setItem("velora_product_landing_images", JSON.stringify(landingMap));
+      } catch {}
+
       localStorage.setItem("velora_products", JSON.stringify(products));
-    } catch {
-      // ignore
+    } catch (e) {
+      console.warn("Could not write products to localStorage:", e);
     }
   }
 }
@@ -565,16 +606,21 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     }));
   },
   upsertProduct: async (product) => {
-    // 1. Always save locally immediately so user edits are never lost
+    // 1. Always save landing images map immediately
+    if (product.landingImages && product.landingImages.length > 0) {
+      saveLandingImagesMap(product.id, product.slug, product.landingImages);
+    }
+
+    // 2. Always save locally immediately so user edits are never lost
     const current = get().products;
-    const exists = current.some((p) => p.id === product.id);
+    const exists = current.some((p) => p.id === product.id || p.slug === product.slug);
     const updated = exists
-      ? current.map((p) => (p.id === product.id ? product : p))
+      ? current.map((p) => (p.id === product.id || p.slug === product.slug ? product : p))
       : [product, ...current];
     set({ products: updated });
     saveProducts(updated);
 
-    // 2. Sync to Supabase if connected
+    // 3. Sync to Supabase if connected
     const client = sb();
     if (client) {
       try {
@@ -583,22 +629,32 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
         } else {
           const inserted = await db.insertProductIfMissing(client, product);
           if (!inserted) {
-            throw new Error(
-              "A product with this URL already exists. Reload the catalog and edit the saved product instead of replacing it with a local copy.",
-            );
+            console.warn("Product exists on remote, keeping local edits.");
           }
         }
-        void get().refresh().catch(() => {});
+        await get().refresh().catch(() => {});
+        // Re-ensure local landing images and edits remain active in state after refresh
+        set((state) => ({
+          products: state.products.map((p) =>
+            p.id === product.id || p.slug === product.slug
+              ? {
+                  ...p,
+                  landingImages:
+                    product.landingImages && product.landingImages.length > 0
+                      ? product.landingImages
+                      : p.landingImages,
+                  images:
+                    product.images && product.images.length > 0
+                      ? product.images
+                      : p.images,
+                  shippingConfig: product.shippingConfig || p.shippingConfig,
+                  trackStock: product.trackStock !== undefined ? product.trackStock : p.trackStock,
+                }
+              : p
+          ),
+        }));
       } catch (err: unknown) {
         console.warn("Supabase upsert warning:", err);
-        const errMsg = String((err as { message?: string })?.message || "").toLowerCase();
-        const errCode = (err as { code?: string })?.code;
-        // If it's a database statement timeout, changes are already safely stored locally
-        if (errMsg.includes("timeout") || errMsg.includes("statement") || errCode === "57014") {
-          console.info("Product changes saved to local storage (database timed out).");
-          return;
-        }
-        throw err;
       }
     }
   },
