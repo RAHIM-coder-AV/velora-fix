@@ -23,6 +23,7 @@ import { uid } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { reconcileProductVariants } from "@/lib/catalog/product-options";
 import { errorMessage } from "@/lib/errors";
+import { getStoredLandingImagesMap, saveLandingImagesMap } from "@/stores/catalog-store";
 
 interface ProductEditModalProps {
   product: Product;
@@ -33,7 +34,7 @@ interface ProductEditModalProps {
 }
 
 // Client-side canvas image compression to keep images sharp while keeping base64 under size limits
-function compressImageFile(file: File, maxDimension = 1400, quality = 0.85): Promise<string> {
+function compressImageFile(file: File, maxDimension = 1100, quality = 0.8): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (readerEvent) => {
@@ -82,6 +83,16 @@ export function ProductEditModal({
   const { locale } = useLocale();
   const [activeTab, setActiveTab] = useState<"general" | "options" | "offers" | "images" | "shipping">("general");
 
+  const getResolvedLandingImages = (p: Product) => {
+    if (p.landingImages && p.landingImages.length > 0) return p.landingImages;
+    if (typeof window !== "undefined") {
+      const map = getStoredLandingImagesMap();
+      const stored = map[p.id] || map[p.slug];
+      if (stored && stored.length > 0) return stored;
+    }
+    return [];
+  };
+
   // Local form state initialized
   const [formData, setFormData] = useState<Product>(() => ({
     ...product,
@@ -91,7 +102,7 @@ export function ProductEditModal({
       fixedHomePrice: 0,
       fixedDeskPrice: 0,
     },
-    landingImages: product.landingImages || [],
+    landingImages: getResolvedLandingImages(product),
     variants: reconcileProductVariants(product.variants, product.sizes, product.colors),
     offers: product.offers || [
       {
@@ -123,7 +134,7 @@ export function ProductEditModal({
           fixedHomePrice: 0,
           fixedDeskPrice: 0,
         },
-        landingImages: product.landingImages || [],
+        landingImages: getResolvedLandingImages(product),
         variants: reconcileProductVariants(product.variants, product.sizes, product.colors),
         offers: product.offers || [
           {
@@ -315,16 +326,20 @@ export function ProductEditModal({
       const newUrls: string[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const compressedUrl = await compressImageFile(file, 1400, 0.88);
+        const compressedUrl = await compressImageFile(file, 1100, 0.8);
         if (compressedUrl) {
           newUrls.push(compressedUrl);
         }
       }
       if (newUrls.length > 0) {
-        setFormData((prev) => ({
-          ...prev,
-          landingImages: [...(prev.landingImages || []), ...newUrls],
-        }));
+        setFormData((prev) => {
+          const next = [...(prev.landingImages || []), ...newUrls];
+          saveLandingImagesMap(prev.id, prev.slug, next);
+          return {
+            ...prev,
+            landingImages: next,
+          };
+        });
       }
     } catch (err) {
       console.error("Failed to upload landing images", err);
@@ -337,18 +352,26 @@ export function ProductEditModal({
   function handleAddLandingImageUrl() {
     const url = newLandingImageUrl.trim();
     if (!url) return;
-    setFormData((prev) => ({
-      ...prev,
-      landingImages: [...(prev.landingImages || []), url],
-    }));
+    setFormData((prev) => {
+      const next = [...(prev.landingImages || []), url];
+      saveLandingImagesMap(prev.id, prev.slug, next);
+      return {
+        ...prev,
+        landingImages: next,
+      };
+    });
     setNewLandingImageUrl("");
   }
 
   function handleRemoveLandingImage(index: number) {
-    setFormData((prev) => ({
-      ...prev,
-      landingImages: (prev.landingImages || []).filter((_, i) => i !== index),
-    }));
+    setFormData((prev) => {
+      const next = (prev.landingImages || []).filter((_, i) => i !== index);
+      saveLandingImagesMap(prev.id, prev.slug, next);
+      return {
+        ...prev,
+        landingImages: next,
+      };
+    });
   }
 
   function handleMoveLandingImage(index: number, direction: "up" | "down") {
@@ -358,6 +381,7 @@ export function ProductEditModal({
     const temp = list[index];
     list[index] = list[targetIndex];
     list[targetIndex] = temp;
+    saveLandingImagesMap(formData.id, formData.slug, list);
     setFormData((prev) => ({ ...prev, landingImages: list }));
   }
 

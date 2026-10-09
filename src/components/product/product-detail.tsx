@@ -9,7 +9,7 @@ import { formatPrice } from "@/lib/utils";
 import { findVariant } from "@/lib/catalog/queries";
 import { useCartStore } from "@/stores/cart-store";
 import { useWishlistStore } from "@/stores/wishlist-store";
-import { useCatalogStore } from "@/stores/catalog-store";
+import { useCatalogStore, getStoredLandingImagesMap } from "@/stores/catalog-store";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { Button } from "@/components/ui/button";
 import { RatingStars } from "@/components/ui/rating-stars";
@@ -30,6 +30,22 @@ export function ProductDetail({
   const { locale, dict } = useLocale();
   const [image, setImage] = useState(0);
   const recordProductView = useCatalogStore((s) => s.recordProductView);
+
+  // Live product from store to reactively update if catalog changes
+  const liveProduct = useCatalogStore((s) =>
+    s.products.find((p) => p.id === product.id || p.slug === product.slug)
+  );
+
+  const activeLandingImages =
+    (liveProduct?.landingImages && liveProduct.landingImages.length > 0
+      ? liveProduct.landingImages
+      : undefined) ||
+    (product.landingImages && product.landingImages.length > 0
+      ? product.landingImages
+      : undefined) ||
+    (typeof window !== "undefined"
+      ? (getStoredLandingImagesMap()[product.id] || getStoredLandingImagesMap()[product.slug] || [])
+      : []);
 
   useEffect(() => {
     if (typeof window === "undefined" || !product?.id) return;
@@ -165,6 +181,53 @@ export function ProductDetail({
               {product.description[locale] || product.description.ar}
             </p>
           </div>
+
+          {/* Product Landing Page Presentation (صفحة هبوط المنتج الترويجية) */}
+          {activeLandingImages && activeLandingImages.length > 0 && (
+            <div className="pt-4 space-y-4">
+              <div className="flex items-center justify-center gap-3 text-center">
+                <span className="h-px w-12 sm:w-16 bg-gradient-to-r from-transparent to-zinc-300 dark:to-zinc-700" />
+                <h2 className="font-serif text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-100">
+                  {locale === "ar" ? "تفاصيل ومميزات المنتج" : "Détails & Présentation"}
+                </h2>
+                <span className="h-px w-12 sm:w-16 bg-gradient-to-l from-transparent to-zinc-300 dark:to-zinc-700" />
+              </div>
+
+              <div className="space-y-4">
+                {activeLandingImages.map((imgUrl, index) => (
+                  <div
+                    key={index}
+                    className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imgUrl}
+                      alt={`${product.name[locale] || product.name.ar} - Landing visual ${index + 1}`}
+                      className="w-full h-auto object-contain block"
+                      loading={index === 0 ? "eager" : "lazy"}
+                    />
+                  </div>
+                ))}
+
+                {/* Bottom CTA to jump to order form */}
+                <div className="pt-2 text-center lg:hidden">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.getElementById("quick-order-form");
+                      if (el) {
+                        el.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }
+                    }}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-8 py-3.5 text-sm sm:text-base font-bold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-700 active:scale-95"
+                  >
+                    <ShoppingBag size={18} />
+                    <span>{locale === "ar" ? "اطلب الآن (الدفع عند الاستلام)" : "Commander maintenant"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right/Order Column */}
@@ -248,53 +311,6 @@ export function ProductDetail({
           </div>
         </div>
       </div>
-
-      {/* Product Landing Page Presentation (صفحة هبوط المنتج الترويجية) */}
-      {product.landingImages && product.landingImages.length > 0 && (
-        <section className="mt-14 space-y-6">
-          <div className="flex items-center justify-center gap-3 text-center">
-            <span className="h-px w-16 bg-gradient-to-r from-transparent to-zinc-300 dark:to-zinc-700" />
-            <h2 className="font-serif text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-              {locale === "ar" ? "تفاصيل ومميزات المنتج" : "Détails & Présentation"}
-            </h2>
-            <span className="h-px w-16 bg-gradient-to-l from-transparent to-zinc-300 dark:to-zinc-700" />
-          </div>
-
-          <div className="mx-auto max-w-4xl space-y-4">
-            {product.landingImages.map((imgUrl, index) => (
-              <div
-                key={index}
-                className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imgUrl}
-                  alt={`${product.name[locale] || product.name.ar} - Landing visual ${index + 1}`}
-                  className="w-full h-auto object-contain block"
-                  loading={index === 0 ? "eager" : "lazy"}
-                />
-              </div>
-            ))}
-
-            {/* Bottom CTA to jump to order form */}
-            <div className="pt-4 text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  const el = document.getElementById("quick-order-form");
-                  if (el) {
-                    el.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }
-                }}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-8 py-3.5 text-sm sm:text-base font-bold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-700 active:scale-95"
-              >
-                <ShoppingBag size={18} />
-                <span>{locale === "ar" ? "اطلب الآن (الدفع عند الاستلام)" : "Commander maintenant"}</span>
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* Reviews Section */}
       <section className="mt-16 border-t border-zinc-200 pt-10 dark:border-zinc-800">

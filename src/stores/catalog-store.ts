@@ -606,17 +606,27 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     }));
   },
   upsertProduct: async (product) => {
-    // 1. Always save landing images map immediately
-    if (product.landingImages && product.landingImages.length > 0) {
-      saveLandingImagesMap(product.id, product.slug, product.landingImages);
+    const landingMap = getStoredLandingImagesMap();
+    const landingImages =
+      product.landingImages && product.landingImages.length > 0
+        ? product.landingImages
+        : landingMap[product.id] || landingMap[product.slug] || [];
+
+    if (landingImages.length > 0) {
+      saveLandingImagesMap(product.id, product.slug, landingImages);
     }
+
+    const fullProduct: Product = {
+      ...product,
+      landingImages,
+    };
 
     // 2. Always save locally immediately so user edits are never lost
     const current = get().products;
-    const exists = current.some((p) => p.id === product.id || p.slug === product.slug);
+    const exists = current.some((p) => p.id === fullProduct.id || p.slug === fullProduct.slug);
     const updated = exists
-      ? current.map((p) => (p.id === product.id || p.slug === product.slug ? product : p))
-      : [product, ...current];
+      ? current.map((p) => (p.id === fullProduct.id || p.slug === fullProduct.slug ? fullProduct : p))
+      : [fullProduct, ...current];
     set({ products: updated });
     saveProducts(updated);
 
@@ -624,10 +634,10 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     const client = sb();
     if (client) {
       try {
-        if (isPersistedProductId(product.id)) {
-          await db.upsertProduct(client, product);
+        if (isPersistedProductId(fullProduct.id)) {
+          await db.upsertProduct(client, fullProduct);
         } else {
-          const inserted = await db.insertProductIfMissing(client, product);
+          const inserted = await db.insertProductIfMissing(client, fullProduct);
           if (!inserted) {
             console.warn("Product exists on remote, keeping local edits.");
           }
@@ -636,19 +646,19 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
         // Re-ensure local landing images and edits remain active in state after refresh
         set((state) => ({
           products: state.products.map((p) =>
-            p.id === product.id || p.slug === product.slug
+            p.id === fullProduct.id || p.slug === fullProduct.slug
               ? {
                   ...p,
                   landingImages:
-                    product.landingImages && product.landingImages.length > 0
-                      ? product.landingImages
-                      : p.landingImages,
+                    fullProduct.landingImages && fullProduct.landingImages.length > 0
+                      ? fullProduct.landingImages
+                      : (landingMap[fullProduct.id] || landingMap[fullProduct.slug] || p.landingImages),
                   images:
-                    product.images && product.images.length > 0
-                      ? product.images
+                    fullProduct.images && fullProduct.images.length > 0
+                      ? fullProduct.images
                       : p.images,
-                  shippingConfig: product.shippingConfig || p.shippingConfig,
-                  trackStock: product.trackStock !== undefined ? product.trackStock : p.trackStock,
+                  shippingConfig: fullProduct.shippingConfig || p.shippingConfig,
+                  trackStock: fullProduct.trackStock !== undefined ? fullProduct.trackStock : p.trackStock,
                 }
               : p
           ),

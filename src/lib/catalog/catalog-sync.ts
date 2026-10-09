@@ -10,19 +10,37 @@ export function mergeCatalogProducts(
   persistedProducts: Product[],
   cachedProducts: Product[],
 ): Product[] {
+  let landingMap: Record<string, string[]> = {};
+  if (typeof window !== "undefined") {
+    try {
+      const saved = localStorage.getItem("velora_product_landing_images");
+      if (saved) landingMap = JSON.parse(saved);
+    } catch {}
+  }
+
   const cachedMap = new Map(cachedProducts.map((p) => [p.id, p]));
   const cachedSlugMap = new Map(cachedProducts.map((p) => [p.slug, p]));
 
   const mergedPersisted = persistedProducts.map((persisted) => {
     const cached = cachedMap.get(persisted.id) || cachedSlugMap.get(persisted.slug);
-    if (!cached) return persisted;
+    const localLanding = landingMap[persisted.id] || landingMap[persisted.slug] || [];
+
+    if (!cached) {
+      return {
+        ...persisted,
+        landingImages:
+          persisted.landingImages && persisted.landingImages.length > 0
+            ? persisted.landingImages
+            : (localLanding.length > 0 ? localLanding : undefined),
+      };
+    }
     return {
       ...persisted,
       // CRITICAL: Always preserve landing images, custom gallery images, and shipping config from local cache!
       landingImages:
         cached.landingImages && cached.landingImages.length > 0
           ? cached.landingImages
-          : persisted.landingImages,
+          : (localLanding.length > 0 ? localLanding : persisted.landingImages),
       shippingConfig: cached.shippingConfig || persisted.shippingConfig,
       trackStock: cached.trackStock !== undefined ? cached.trackStock : persisted.trackStock,
       images:
