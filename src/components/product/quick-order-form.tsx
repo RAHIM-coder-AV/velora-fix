@@ -349,6 +349,11 @@ export function QuickOrderForm({
 
       addOrder(newOrder);
       void sendTelegramOrderNotification(newOrder, useSettingsStore.getState().settings.telegram);
+      try {
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem(`velora_purchase_tracked_${newOrder.reference || ref}`, "1");
+        }
+      } catch {}
       trackPurchaseEvent({
         orderId: newOrder.reference,
         total: newOrder.total,

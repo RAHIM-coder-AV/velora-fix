@@ -26,35 +26,38 @@ export function mergeCatalogProducts(
     const localLanding = landingMap[persisted.id] || landingMap[persisted.slug] || [];
 
     if (!cached) {
-      return {
-        ...persisted,
-        landingImages:
-          persisted.landingImages && persisted.landingImages.length > 0
-            ? persisted.landingImages
-            : (localLanding.length > 0 ? localLanding : undefined),
-      };
+      const p: Product = { ...persisted };
+      if (localLanding.length > 0) {
+        p.landingImages = localLanding;
+      }
+      return p;
     }
-    return {
-      ...persisted,
-      // CRITICAL: Always preserve landing images, custom gallery images, and shipping config from local cache!
-      landingImages:
-        cached.landingImages && cached.landingImages.length > 0
-          ? cached.landingImages
-          : (localLanding.length > 0 ? localLanding : persisted.landingImages),
-      shippingConfig: cached.shippingConfig || persisted.shippingConfig,
-      trackStock: cached.trackStock !== undefined ? cached.trackStock : persisted.trackStock,
-      images:
-        cached.images && cached.images.length > 0
-          ? cached.images
-          : persisted.images,
-      offers: (cached.offers && cached.offers.length > 0) ? cached.offers : persisted.offers,
-      views: Math.max(persisted.views ?? 0, cached.views ?? 0),
-    };
+    const p: Product = { ...persisted };
+    if (cached.landingImages && cached.landingImages.length > 0) {
+      p.landingImages = cached.landingImages;
+    } else if (localLanding.length > 0) {
+      p.landingImages = localLanding;
+    }
+    if (cached.shippingConfig) p.shippingConfig = cached.shippingConfig;
+    if (cached.trackStock !== undefined) p.trackStock = cached.trackStock;
+    if (cached.images && cached.images.length > 0) p.images = cached.images;
+    if (cached.offers && cached.offers.length > 0) p.offers = cached.offers;
+    if (persisted.views !== undefined || cached.views !== undefined) {
+      p.views = Math.max(persisted.views ?? 0, cached.views ?? 0);
+    }
+    return p;
   });
 
   const persistedSlugs = new Set(persistedProducts.map((product) => product.slug));
   const cachedOnlyProducts = cachedProducts.filter(
-    (product) => !isPersistedProductId(product.id) && !persistedSlugs.has(product.slug),
+    (product) =>
+      !isPersistedProductId(product.id) &&
+      !persistedSlugs.has(product.slug) &&
+      !product.id.startsWith("p_") &&
+      !product.slug.startsWith("old-money") &&
+      !product.slug.startsWith("pantalon-lin") &&
+      !product.slug.startsWith("robe-rope") &&
+      !product.slug.startsWith("zip-veste-ovrzise"),
   );
   return [...mergedPersisted, ...cachedOnlyProducts];
 }

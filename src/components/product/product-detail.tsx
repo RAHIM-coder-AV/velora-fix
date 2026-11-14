@@ -17,6 +17,7 @@ import { toast } from "@/components/ui/toast";
 import { ProductGrid } from "@/components/product/product-grid";
 import { QuickOrderForm } from "@/components/product/quick-order-form";
 import { cn } from "@/lib/utils";
+import { trackViewContentEvent, trackAddToCartEvent } from "@/components/analytics/analytics-scripts";
 
 export function ProductDetail({
   product,
@@ -54,7 +55,13 @@ export function ProductDetail({
       sessionStorage.setItem(sessionKey, "1");
       void recordProductView(product.id);
     }
-  }, [product?.id, recordProductView]);
+    trackViewContentEvent({
+      productId: product.id,
+      productName: product.name[locale] || product.name.ar,
+      price: product.price,
+      currency: "DZD",
+    });
+  }, [product?.id, product.name, product.price, locale, recordProductView]);
 
   // Available sizes (if tracking stock is enabled, only show stock > 0)
   const availableSizes = (() => {
@@ -115,6 +122,13 @@ export function ProductDetail({
       return;
     }
     addItem({ productId: product.id, variantId: variant.id, quantity: 1 });
+    trackAddToCartEvent({
+      productId: product.id,
+      productName: product.name[locale] || product.name.ar,
+      price: product.price,
+      quantity: 1,
+      currency: "DZD",
+    });
     toast(dict.product.added);
   }
 

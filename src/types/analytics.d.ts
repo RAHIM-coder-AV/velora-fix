@@ -7,6 +7,6 @@ interface Window {
   };
   __veloraMetaInitialized?: string[];
   __veloraTikTokInitialized?: string[];
-  __veloraPendingMetaEvents?: Array<{ event: string; data: Record<string, unknown> }>;
+  __veloraPendingMetaEvents?: Array<{ event: string; data: Record<string, unknown>; eventId?: string }>;
   __veloraPendingTikTokEvents?: Array<{ event: string; data: Record<string, unknown> }>;
 }

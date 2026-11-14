@@ -486,8 +486,8 @@ export function StoreHomepage({ locale }: StoreHomepageProps) {
               </div>
               <p className="text-xs leading-relaxed text-stone-700 sm:text-sm">
                 {isAr
-                  ? "«تيشرت Old Money وبنطلون الكتان أروع من الصور! المقاسات مضبوطة بدقة والتعامل مع خدمة الزبائن احترافي وسريع.»"
-                  : "« Le polo Old Money et le pantalon en lin sont sublimes ! Tailles parfaites et service client d'un grand professionnalisme. »"}
+                  ? "«المنتجات أروع بكثير من الصور! القماش والخياطة بجودة عالية جداً، والمقاسات مضبوطة والتعامل مع خدمة الزبائن احترافي وسريع.»"
+                  : "« Les articles sont sublimes et la qualité est au rendez-vous ! Tailles parfaites et service client d'un grand professionnalisme. »"}
               </p>
               <div className="mt-4 flex items-center gap-3 border-t border-stone-100 pt-4">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-200 font-bold text-stone-800 text-xs">
@@ -508,8 +508,8 @@ export function StoreHomepage({ locale }: StoreHomepageProps) {
               </div>
               <p className="text-xs leading-relaxed text-stone-700 sm:text-sm">
                 {isAr
-                  ? "«فستان Rope أنيق جداً وخفيف وناعم على البشرة. طلبت قطعتين واستفدت من العرض الخاص، أنصح بالتعامل معهم دائماً.»"
-                  : "« Robe Rope d'une élégance rare, tissu fluide et agréable. Les packs promo sont très avantageux. Je recommande vivement ! »"}
+                  ? "«موديلات في قمة الأناقة، خامات مريحة وفخمة ومتقنة. استفدت من العرض الخاص والتوصيل كان سريعاً. أنصح بالتعامل معهم دائماً.»"
+                  : "« Des pièces d'une élégance rare, tissu fluide et très agréable. Les packs promo sont avantageux et la livraison rapide. Je recommande vivement ! »"}
               </p>
               <div className="mt-4 flex items-center gap-3 border-t border-stone-100 pt-4">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 font-bold text-purple-800 text-xs">

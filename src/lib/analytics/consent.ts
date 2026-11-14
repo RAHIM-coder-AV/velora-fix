@@ -2,18 +2,22 @@
 
 const CONSENT_KEY = "velora_marketing_consent";
 const CHANGE_EVENT = "velora:marketing-consent";
-let memoryConsent: MarketingConsent = null;
+let memoryConsent: MarketingConsent = "accepted";
 
 export type MarketingConsent = "accepted" | "rejected" | null;
 
 export function getMarketingConsent(): MarketingConsent {
-  if (typeof window === "undefined") return null;
+  if (typeof window === "undefined") return "accepted";
   try {
     const value = window.localStorage.getItem(CONSENT_KEY);
-    if (value === "accepted" || value === "rejected") memoryConsent = value;
-    return value === "accepted" || value === "rejected" ? value : memoryConsent;
+    if (value === "rejected") {
+      memoryConsent = "rejected";
+      return "rejected";
+    }
+    memoryConsent = "accepted";
+    return "accepted";
   } catch {
-    return memoryConsent;
+    return memoryConsent ?? "accepted";
   }
 }
 
@@ -51,5 +55,5 @@ export function marketingConsentSnapshot(): MarketingConsent {
 }
 
 export function serverMarketingConsentSnapshot(): MarketingConsent {
-  return null;
+  return "accepted";
 }

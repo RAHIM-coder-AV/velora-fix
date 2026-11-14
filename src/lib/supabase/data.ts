@@ -775,29 +775,50 @@ export async function fetchProfile(sb: SupabaseClient, userId: string): Promise<
 }
 
 export async function fetchPixelSettings(sb: SupabaseClient): Promise<PixelSettings> {
-  const { data, error } = await sb
-    .from("store_pixel_settings")
-    .select("meta_pixel_ids, meta_pixel_enabled, tiktok_pixel_ids, tiktok_pixel_enabled")
-    .eq("id", "default")
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) {
-    return {
-      metaPixelIds: Array(6).fill(""),
-      metaPixelEnabled: Array(6).fill(false),
-      tiktokPixelIds: Array(4).fill(""),
-      tiktokPixelEnabled: Array(4).fill(false),
-    };
+  try {
+    const { data, error } = await sb
+      .from("store_pixel_settings")
+      .select("meta_pixel_ids, meta_pixel_enabled, tiktok_pixel_ids, tiktok_pixel_enabled")
+      .eq("id", "default")
+      .maybeSingle();
+    if (error) {
+      console.warn("fetchPixelSettings warning:", error.message);
+    }
+    if (data) {
+      return {
+        metaPixelIds: (data.meta_pixel_ids as string[]) || Array(6).fill(""),
+        metaPixelEnabled: (data.meta_pixel_enabled as boolean[]) || Array(6).fill(false),
+        tiktokPixelIds: (data.tiktok_pixel_ids as string[]) || Array(4).fill(""),
+        tiktokPixelEnabled: (data.tiktok_pixel_enabled as boolean[]) || Array(4).fill(false),
+      };
+    }
+  } catch (err) {
+    console.warn("Could not fetch remote pixel settings:", err);
   }
+
   return {
-    metaPixelIds: data.meta_pixel_ids as string[],
-    metaPixelEnabled: data.meta_pixel_enabled as boolean[],
-    tiktokPixelIds: data.tiktok_pixel_ids as string[],
-    tiktokPixelEnabled: data.tiktok_pixel_enabled as boolean[],
+    metaPixelIds: Array(6).fill(""),
+    metaPixelEnabled: Array(6).fill(false),
+    tiktokPixelIds: Array(4).fill(""),
+    tiktokPixelEnabled: Array(4).fill(false),
   };
 }
 
 export async function savePixelSettings(sb: SupabaseClient, pixels: PixelSettings) {
+  // Strategy 1: Try secure RPC function (safe from RLS recursion)
+  try {
+    const { error: rpcError } = await sb.rpc("save_pixel_settings", {
+      p_meta_pixel_ids: pixels.metaPixelIds,
+      p_meta_pixel_enabled: pixels.metaPixelEnabled,
+      p_tiktok_pixel_ids: pixels.tiktokPixelIds,
+      p_tiktok_pixel_enabled: pixels.tiktokPixelEnabled,
+    });
+    if (!rpcError) return;
+  } catch {
+    // Continue to strategy 2
+  }
+
+  // Strategy 2: Upsert into store_pixel_settings directly
   const { error } = await sb.from("store_pixel_settings").upsert(
     {
       id: "default",

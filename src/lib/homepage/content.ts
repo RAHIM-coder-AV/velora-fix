@@ -222,12 +222,10 @@ export function productsForHomepageSection(
   const limit = section.id === "featured" ? 8 : 4;
   if (section.selectionMode === "curated") {
     const bySlug = new Map(available.map((product) => [product.slug, product]));
-    const curated = section.productSlugs.flatMap((slug) => {
+    return section.productSlugs.flatMap((slug) => {
       const product = bySlug.get(slug);
       return product ? [product] : [];
     });
-    if (curated.length > 0) return curated;
-    return available.slice(0, limit);
   }
   const flag = section.id === "featured" ? "featured" : "isNew";
   const filtered = available.filter((product) => product[flag]);

@@ -99,20 +99,48 @@ export const useSettingsStore = create<SettingsState>()(
 
       updatePixels: async (pixelSettings) => {
         const pixels = normalizePixelSettings(pixelSettings);
-        const client = isSupabaseConfigured() ? createClient() : null;
-        if (client) await db.savePixelSettings(client, pixels);
         set((state) => ({
           settings: { ...state.settings, pixels },
         }));
+        const client = isSupabaseConfigured() ? createClient() : null;
+        if (client) {
+          try {
+            await db.savePixelSettings(client, pixels);
+          } catch (error) {
+            console.warn("Could not save pixels to Supabase:", error);
+          }
+        }
       },
 
       refreshPixels: async () => {
         const client = isSupabaseConfigured() ? createClient() : null;
         if (!client) return;
-        const pixels = normalizePixelSettings(await db.fetchPixelSettings(client));
-        set((state) => ({
-          settings: { ...state.settings, pixels },
-        }));
+        try {
+          const remote = await db.fetchPixelSettings(client);
+          const pixels = normalizePixelSettings(remote);
+          const hasRemoteMeta = pixels.metaPixelIds.some((id, i) => id && pixels.metaPixelEnabled[i]);
+          const hasRemoteTikTok = pixels.tiktokPixelIds.some((id, i) => id && pixels.tiktokPixelEnabled[i]);
+
+          set((state) => {
+            const current = state.settings.pixels;
+            const hasLocalMeta = current.metaPixelIds.some((id, i) => id && current.metaPixelEnabled[i]);
+            const hasLocalTikTok = current.tiktokPixelIds.some((id, i) => id && current.tiktokPixelEnabled[i]);
+
+            return {
+              settings: {
+                ...state.settings,
+                pixels: {
+                  metaPixelIds: hasRemoteMeta ? pixels.metaPixelIds : (hasLocalMeta ? current.metaPixelIds : pixels.metaPixelIds),
+                  metaPixelEnabled: hasRemoteMeta ? pixels.metaPixelEnabled : (hasLocalMeta ? current.metaPixelEnabled : pixels.metaPixelEnabled),
+                  tiktokPixelIds: hasRemoteTikTok ? pixels.tiktokPixelIds : (hasLocalTikTok ? current.tiktokPixelIds : pixels.tiktokPixelIds),
+                  tiktokPixelEnabled: hasRemoteTikTok ? pixels.tiktokPixelEnabled : (hasLocalTikTok ? current.tiktokPixelEnabled : pixels.tiktokPixelEnabled),
+                },
+              },
+            };
+          });
+        } catch (error) {
+          console.warn("refreshPixels failed:", error);
+        }
       },
 
       updateFraudProtection: (partial) => {

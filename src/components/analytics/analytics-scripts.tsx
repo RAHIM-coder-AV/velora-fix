@@ -11,29 +11,74 @@ import {
 } from "@/lib/analytics/consent";
 import { enabledMetaPixelIds, enabledTikTokPixelIds } from "@/lib/analytics/pixels";
 
-type EventData = {
+export type EventData = {
   value?: number;
   currency?: string;
   content_ids?: string[];
+  contents?: Array<{ id: string; quantity: number; item_price: number }>;
   content_name?: string;
   content_type?: string;
   order_id?: string;
   num_items?: number;
 };
 
-function track(eventName: string, data: EventData = {}) {
-  if (typeof window === "undefined" || marketingConsentSnapshot() !== "accepted") return;
-  if (window.fbq) window.fbq("track", eventName, data);
-  else if (eventName !== "PageView") {
+export function track(eventName: string, data: EventData = {}, eventId?: string) {
+  if (typeof window === "undefined" || marketingConsentSnapshot() === "rejected") return;
+
+  // Track Meta Pixel
+  if (typeof window.fbq === "function") {
+    if (eventId) {
+      window.fbq("track", eventName, data, { eventID: eventId });
+    } else {
+      window.fbq("track", eventName, data);
+    }
+  } else if (eventName !== "PageView") {
     window.__veloraPendingMetaEvents ??= [];
-    window.__veloraPendingMetaEvents.push({ event: eventName, data });
+    window.__veloraPendingMetaEvents.push({ event: eventName, data, eventId });
   }
-  if (eventName === "PageView") window.ttq?.page?.();
-  else if (window.ttq?.track) window.ttq.track(eventName, data);
-  else if (eventName !== "PageView") {
+
+  // Track TikTok Pixel
+  if (eventName === "PageView") {
+    window.ttq?.page?.();
+  } else if (typeof window.ttq?.track === "function") {
+    window.ttq.track(eventName, data);
+  } else if (eventName !== "PageView") {
     window.__veloraPendingTikTokEvents ??= [];
     window.__veloraPendingTikTokEvents.push({ event: eventName, data });
   }
+}
+
+export function trackViewContentEvent(product: {
+  productId: string;
+  productName: string;
+  price: number;
+  currency?: string;
+}) {
+  track("ViewContent", {
+    content_ids: [product.productId],
+    content_name: product.productName,
+    content_type: "product",
+    value: product.price,
+    currency: product.currency || "DZD",
+  });
+}
+
+export function trackAddToCartEvent(product: {
+  productId: string;
+  productName: string;
+  price: number;
+  quantity?: number;
+  currency?: string;
+}) {
+  const qty = product.quantity || 1;
+  track("AddToCart", {
+    content_ids: [product.productId],
+    content_name: product.productName,
+    content_type: "product",
+    value: product.price * qty,
+    currency: product.currency || "DZD",
+    num_items: qty,
+  });
 }
 
 export function trackInitiateCheckoutEvent(data: {
@@ -58,16 +103,36 @@ export function trackPurchaseEvent(orderData: {
   currency?: string;
   items?: Array<{ productId?: string; name: string; price: number; quantity: number }>;
 }) {
+  if (typeof window === "undefined" || marketingConsentSnapshot() === "rejected") return;
+
+  const currency = orderData.currency || "DZD";
+  const numItems = orderData.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 1;
+  const contentIds = orderData.items?.map((item) => item.productId).filter((id): id is string => Boolean(id)) || [];
+  const contents = orderData.items?.map((item) => ({
+    id: item.productId || item.name,
+    quantity: item.quantity || 1,
+    item_price: item.price || 0,
+  })) || [];
+
   const data: EventData = {
-    value: orderData.total,
-    currency: orderData.currency || "DZD",
+    value: Number(orderData.total) || 0,
+    currency,
     content_type: "product",
-    content_ids: orderData.items?.map((item) => item.productId).filter((id): id is string => Boolean(id)),
+    content_name: orderData.items?.[0]?.name || ("Order #" + orderData.orderId),
+    content_ids: contentIds,
+    contents,
     order_id: orderData.orderId,
+    num_items: numItems,
   };
-  if (typeof window === "undefined" || marketingConsentSnapshot() !== "accepted") return;
-  window.fbq?.("track", "Purchase", data);
-  window.ttq?.track?.("CompletePayment", data);
+
+  // Safe tracking with queue support and eventID for deduplication
+  track("Purchase", data, orderData.orderId);
+  if (typeof window.ttq?.track === "function") {
+    window.ttq.track("CompletePayment", data);
+  } else {
+    window.__veloraPendingTikTokEvents ??= [];
+    window.__veloraPendingTikTokEvents.push({ event: "CompletePayment", data });
+  }
 }
 
 export function AnalyticsScripts() {
@@ -79,8 +144,8 @@ export function AnalyticsScripts() {
     marketingConsentSnapshot,
     serverMarketingConsentSnapshot,
   );
-  const metaIds = consent === "accepted" ? enabledMetaPixelIds(pixels) : [];
-  const tiktokIds = consent === "accepted" ? enabledTikTokPixelIds(pixels) : [];
+  const metaIds = consent !== "rejected" ? enabledMetaPixelIds(pixels) : [];
+  const tiktokIds = consent !== "rejected" ? enabledTikTokPixelIds(pixels) : [];
   const lastPathname = useRef(pathname);
 
   useEffect(() => {
@@ -92,7 +157,7 @@ export function AnalyticsScripts() {
   useEffect(() => {
     if (lastPathname.current === pathname) return;
     lastPathname.current = pathname;
-    if (consent !== "accepted") return;
+    if (consent === "rejected") return;
     track("PageView");
   }, [consent, pathname]);
 
@@ -109,7 +174,13 @@ export function AnalyticsScripts() {
     window.__veloraMetaInitialized=window.__veloraMetaInitialized||[];
     ids.forEach(function(id){if(!window.__veloraMetaInitialized.includes(id)){fbq('init',id);window.__veloraMetaInitialized.push(id);fbq('trackSingle',id,'PageView')}});
     var queued=window.__veloraPendingMetaEvents||[];
-    queued.forEach(function(item){fbq('track',item.event,item.data)});
+    queued.forEach(function(item){
+      if(item.eventId) {
+        fbq('track',item.event,item.data,{eventID:item.eventId});
+      } else {
+        fbq('track',item.event,item.data);
+      }
+    });
     window.__veloraPendingMetaEvents=[];
   `;
 

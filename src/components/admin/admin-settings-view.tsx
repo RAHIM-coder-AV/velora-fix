@@ -34,6 +34,7 @@ import { useLocale } from "@/providers/locale-provider";
 import { toast } from "@/components/ui/toast";
 import { isSupabaseConfigured } from "@/lib/supabase/configured";
 import { locales, type Locale } from "@/i18n/config";
+import { ALGERIA_WILAYAS } from "@/lib/algeria-data";
 
 type SettingsSection =
   | "overview"
@@ -132,9 +133,22 @@ export function AdminSettingsView({
     }
   }
 
-  // Filter Wilayas
+  // Filter and sort Wilayas strictly from 1 to 58
   const filteredWilayas = useMemo(() => {
-    const list = Object.values(settings.wilayaPrices);
+    const list = ALGERIA_WILAYAS.map((wilaya) => {
+      const existing = settings.wilayaPrices[wilaya.code];
+      if (existing) return existing;
+      return {
+        code: wilaya.code,
+        nameAr: wilaya.nameAr,
+        nameFr: wilaya.nameFr,
+        homePrice: settings.defaultHomePrice ?? 600,
+        deskPrice: settings.defaultDeskPrice ?? 400,
+        enabled: true,
+        deskEnabled: true,
+      };
+    }).sort((a, b) => (parseInt(a.code, 10) || 0) - (parseInt(b.code, 10) || 0));
+
     const q = searchQuery.trim().toLowerCase();
     if (!q) return list;
     return list.filter(
@@ -143,7 +157,7 @@ export function AdminSettingsView({
         w.nameAr.toLowerCase().includes(q) ||
         w.nameFr.toLowerCase().includes(q)
     );
-  }, [settings.wilayaPrices, searchQuery]);
+  }, [settings.wilayaPrices, settings.defaultHomePrice, settings.defaultDeskPrice, searchQuery]);
 
   function handleSaveEcoTrack() {
     updateEcoTrack({

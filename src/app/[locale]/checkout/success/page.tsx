@@ -7,6 +7,8 @@ import { useLocale } from "@/providers/locale-provider";
 import { LocaleLink } from "@/components/layout/language-switcher";
 import { Container } from "@/components/ui/container";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useCatalogStore } from "@/stores/catalog-store";
+import { trackPurchaseEvent } from "@/components/analytics/analytics-scripts";
 
 function CheckoutSuccessPageContent() {
   const { dict, locale } = useLocale();
@@ -14,11 +16,73 @@ function CheckoutSuccessPageContent() {
   const thankYou = useSettingsStore((state) => state.settings.storefront.thankYou);
   const refreshSharedSettings = useSettingsStore((state) => state.refreshSharedSettings);
 
+  const ref = searchParams.get("ref") ?? "";
+
   useEffect(() => {
     void refreshSharedSettings().catch((error) => console.error("Failed to load thank-you page settings", error));
   }, [refreshSharedSettings]);
 
-  const ref = searchParams.get("ref") ?? "";
+  // Guaranteed Purchase event tracking on Thank You page
+  useEffect(() => {
+    if (!ref || typeof window === "undefined") return;
+    const trackedKey = `velora_purchase_tracked_${ref}`;
+    if (sessionStorage.getItem(trackedKey)) return;
+
+    const orders = useCatalogStore.getState().orders;
+    const order = orders.find((o) => o.reference === ref || o.id === ref);
+
+    if (order) {
+      sessionStorage.setItem(trackedKey, "1");
+      trackPurchaseEvent({
+        orderId: order.reference,
+        total: order.total,
+        currency: "DZD",
+        items: order.items.map((item) => ({
+          productId: item.productId,
+          name: item.name.fr || item.name.ar,
+          price: item.unitPrice,
+          quantity: item.quantity,
+        })),
+      });
+      return;
+    }
+
+    try {
+      const stored = localStorage.getItem("velora_orders_v1");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const found = Array.isArray(parsed)
+          ? parsed.find((o: { reference?: string; id?: string; total?: number; items?: Array<{ productId?: string; name?: { fr?: string; ar?: string }; unitPrice?: number; quantity?: number }> }) => o.reference === ref || o.id === ref)
+          : null;
+        if (found) {
+          sessionStorage.setItem(trackedKey, "1");
+          trackPurchaseEvent({
+            orderId: found.reference || ref,
+            total: found.total || 0,
+            currency: "DZD",
+            items: found.items?.map((item: { productId?: string; name?: { fr?: string; ar?: string }; unitPrice?: number; quantity?: number }) => ({
+              productId: item.productId,
+              name: item.name?.fr || item.name?.ar || "",
+              price: item.unitPrice || 0,
+              quantity: item.quantity || 1,
+            })),
+          });
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // Fallback minimal event if order data is delayed
+    sessionStorage.setItem(trackedKey, "1");
+    trackPurchaseEvent({
+      orderId: ref,
+      total: 0,
+      currency: "DZD",
+    });
+  }, [ref]);
+
   const body = (thankYou?.body?.[locale] || dict.checkout.successBody).replace("{ref}", ref);
   const title = thankYou?.title?.[locale] || dict.checkout.successTitle;
   const highlightBanner = thankYou?.highlightBanner?.[locale] || (locale === "ar" ? "تم تسجيل طلبك بنجاح وسنتصل بك لتأكيده" : "Votre commande a été enregistrée avec succès");

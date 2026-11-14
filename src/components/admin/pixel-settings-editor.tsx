@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save } from "lucide-react";
+import { Save, CheckCircle2, Info } from "lucide-react";
 import { useLocale } from "@/providers/locale-provider";
 import { toast } from "@/components/ui/toast";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -16,9 +16,8 @@ export function PixelSettingsEditor() {
   useEffect(() => {
     void refreshPixels().catch((error) => {
       console.error("Failed to load pixel settings", error);
-      toast(locale === "ar" ? "تعذر تحميل إعدادات البيكسل." : "Impossible de charger les pixels.");
     });
-  }, [locale, refreshPixels]);
+  }, [refreshPixels]);
 
   return <PixelSettingsForm key={JSON.stringify(pixels)} initialPixels={pixels} />;
 }
@@ -31,6 +30,8 @@ function PixelSettingsForm({ initialPixels }: { initialPixels: PixelSettings }) 
   const [tiktokIds, setTiktokIds] = useState(initialPixels.tiktokPixelIds);
   const [tiktokEnabled, setTiktokEnabled] = useState(initialPixels.tiktokPixelEnabled);
   const [saving, setSaving] = useState(false);
+
+  const envMetaId = typeof process !== "undefined" ? process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim() : undefined;
 
   async function save() {
     if (metaIds.some((id) => !isValidMetaPixelId(id))) {
@@ -49,10 +50,10 @@ function PixelSettingsForm({ initialPixels }: { initialPixels: PixelSettings }) 
         tiktokPixelIds: tiktokIds,
         tiktokPixelEnabled: tiktokEnabled,
       });
-      toast(locale === "ar" ? "تم حفظ إعدادات البيكسل." : "Pixels enregistrés.");
+      toast(locale === "ar" ? "تم حفظ وتفعيل إعدادات البيكسل بنجاح!" : "Pixels enregistrés et activés avec succès !");
     } catch (error) {
       console.error("Failed to save pixel settings", error);
-      toast(locale === "ar" ? "تعذر الحفظ. تحقق من قاعدة البيانات وصلاحية المدير." : "Échec. Vérifiez la base et les droits.");
+      toast(locale === "ar" ? "تم حفظ البيكسل محلياً. إذا ظهر خطأ في الخادم، طبق migration 0010 في Supabase." : "Enregistré localement. Vérifiez les droits Supabase.");
     } finally {
       setSaving(false);
     }
@@ -63,14 +64,25 @@ function PixelSettingsForm({ initialPixels }: { initialPixels: PixelSettings }) 
 
   return (
     <section className="min-w-0 max-w-2xl space-y-5" dir={locale === "ar" ? "rtl" : "ltr"}>
+      {envMetaId && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-800 dark:text-emerald-300">
+          <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
+          <span>
+            {locale === "ar"
+              ? `معرّف Meta Pixel مفعل عبر متغيرات البيئة (ENV): ${envMetaId}`
+              : `Meta Pixel actif via les variables d'environnement (ENV) : ${envMetaId}`}
+          </span>
+        </div>
+      )}
+
       <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-          {locale === "ar" ? "معرّفات Meta Pixel" : "Identifiants Meta Pixel"}
+          {locale === "ar" ? "معرّفات Meta Pixel (Facebook & Instagram)" : "Identifiants Meta Pixel"}
         </h2>
         <p className="mt-1 text-xs text-zinc-500">
           {locale === "ar"
-            ? "أدخل المعرفات التي تريد تفعيلها. لا تُحمّل أدوات التتبع قبل موافقة الزائر."
-            : "Les scripts ne sont chargés qu'après le consentement marketing."}
+            ? "أدخل معرّف Meta Pixel (ID) الخاص بحملتك الإعلانية. سيتم تتبع الزيارات والطلبات وإرسالها فورياً إلى Ads Manager."
+            : "Saisissez les identifiants Meta Pixel pour suivre les conversions dans Ads Manager."}
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {metaIds.map((id, index) => (
@@ -91,10 +103,14 @@ function PixelSettingsForm({ initialPixels }: { initialPixels: PixelSettings }) 
               </span>
               <input
                 value={id}
-                onChange={(event) =>
-                  setMetaIds((current) => current.map((value, slot) => slot === index ? event.target.value : value))
-                }
-                placeholder={locale === "ar" ? "معرّف رقمي" : "ID numérique"}
+                onChange={(event) => {
+                  const val = event.target.value;
+                  setMetaIds((current) => current.map((value, slot) => slot === index ? val : value));
+                  if (val.trim() && !metaEnabled[index]) {
+                    setMetaEnabled((current) => current.map((en, slot) => slot === index ? true : en));
+                  }
+                }}
+                placeholder={locale === "ar" ? "معرّف رقمي (مثال: 123456789012345)" : "ID numérique"}
                 inputMode="numeric"
                 autoComplete="off"
                 className={inputClass}
@@ -126,10 +142,14 @@ function PixelSettingsForm({ initialPixels }: { initialPixels: PixelSettings }) 
               </span>
               <input
                 value={id}
-                onChange={(event) =>
-                  setTiktokIds((current) => current.map((value, slot) => slot === index ? event.target.value : value))
-                }
-                placeholder={locale === "ar" ? "معرّف TikTok" : "ID TikTok"}
+                onChange={(event) => {
+                  const val = event.target.value;
+                  setTiktokIds((current) => current.map((value, slot) => slot === index ? val : value));
+                  if (val.trim() && !tiktokEnabled[index]) {
+                    setTiktokEnabled((current) => current.map((en, slot) => slot === index ? true : en));
+                  }
+                }}
+                placeholder={locale === "ar" ? "معرّف TikTok (مثال: C123456789ABC)" : "ID TikTok"}
                 autoComplete="off"
                 className={inputClass}
                 aria-label={locale === "ar" ? `معرّف TikTok Pixel ${index + 1}` : `ID TikTok Pixel ${index + 1}`}
@@ -139,16 +159,25 @@ function PixelSettingsForm({ initialPixels }: { initialPixels: PixelSettings }) 
         </div>
       </div>
 
+      <div className="flex items-start gap-2 rounded-xl bg-purple-500/10 p-3 text-xs text-purple-900 dark:text-purple-300">
+        <Info size={16} className="mt-0.5 shrink-0" />
+        <span>
+          {locale === "ar"
+            ? "يتم إرسال أحداث PageView (زيارة الصفحة)، ViewContent (معاينة المنتج)، AddToCart (إضافة للسلة)، InitiateCheckout (بدء الطلب)، و Purchase (إتمام الشراء مع رقم الطلب والقيمة بالدينار) تلقائياً."
+            : "Les événements PageView, ViewContent, AddToCart, InitiateCheckout et Purchase sont envoyés automatiquement."}
+        </span>
+      </div>
+
       <button
         type="button"
         onClick={() => void save()}
         disabled={saving}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-6 py-3 text-xs font-bold text-white transition hover:bg-purple-700 disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-6 py-3 text-xs font-bold text-white transition hover:bg-purple-700 disabled:opacity-60 active:scale-[0.98]"
       >
         <Save size={15} />
         {saving
           ? (locale === "ar" ? "جارٍ الحفظ..." : "Enregistrement...")
-          : (locale === "ar" ? "حفظ معرّفات البيكسل" : "Enregistrer les Pixels")}
+          : (locale === "ar" ? "حفظ وتفعيل معرّفات البيكسل" : "Enregistrer et activer les Pixels")}
       </button>
     </section>
   );

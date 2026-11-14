@@ -200,6 +200,11 @@ export function CheckoutForm() {
 
     addOrder(order);
     void sendTelegramOrderNotification(order, useSettingsStore.getState().settings.telegram);
+    try {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(`velora_purchase_tracked_${order.reference}`, "1");
+      }
+    } catch {}
     trackPurchaseEvent({
       orderId: order.reference,
       total: order.total,

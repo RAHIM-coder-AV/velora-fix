@@ -30,269 +30,7 @@ import { uid } from "@/lib/utils";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const initialOrders: Order[] = [
-  {
-    id: "ord_01",
-    reference: "VL-849201",
-    customerName: "Benrmas samah",
-    phone: "0798355584",
-    wilaya: "31 - وهران",
-    commune: "وهران",
-    address: "وسط المدينة",
-    status: "confirmed",
-    paymentMethod: "cod",
-    subtotal: 3800,
-    shipping: 600,
-    total: 4400,
-    offerTitle: "فستان + توصيل",
-    createdAt: new Date(Date.now() - 24 * 60 * 1000).toISOString(),
-    items: [
-      {
-        id: "oi_1",
-        productId: "p_robe_rope",
-        variantId: "p_robe_rope_Standard_FFB6C1",
-        name: { fr: "Rope", ar: "فستان روب عصري" },
-        size: "Standard",
-        color: { fr: "Rose", ar: "وردي" },
-        image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=80",
-        unitPrice: 3800,
-        quantity: 1,
-      },
-    ],
-  },
-  {
-    id: "ord_02",
-    reference: "VL-739102",
-    customerName: "محاني",
-    phone: "0775396053",
-    wilaya: "23 - عنابة",
-    commune: "عنابة",
-    address: "سيدي إبراهيم",
-    status: "processing",
-    paymentMethod: "cod",
-    subtotal: 3800,
-    shipping: 650,
-    total: 4450,
-    offerTitle: "فستان صيفي",
-    createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    items: [
-      {
-        id: "oi_2",
-        productId: "p_robe_rope",
-        variantId: "p_robe_rope_XL_FFB6C1",
-        name: { fr: "Rope", ar: "فستان روب عصري" },
-        size: "XL",
-        color: { fr: "Rose", ar: "وردي" },
-        image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=80",
-        unitPrice: 3800,
-        quantity: 1,
-      },
-    ],
-  },
-  {
-    id: "ord_03",
-    reference: "VL-619283",
-    customerName: "تواتي",
-    phone: "0554951345",
-    wilaya: "09 - البليدة",
-    commune: "البليدة",
-    address: "باب الخويخة",
-    status: "processing",
-    paymentMethod: "cod",
-    subtotal: 3800,
-    shipping: 500,
-    total: 4300,
-    offerTitle: "فستان روب",
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    items: [
-      {
-        id: "oi_3",
-        productId: "p_robe_rope",
-        variantId: "p_robe_rope_Standard_FFB6C1",
-        name: { fr: "Rope", ar: "فستان روب عصري" },
-        size: "Standard",
-        color: { fr: "Rose", ar: "وردي" },
-        image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=80",
-        unitPrice: 3800,
-        quantity: 1,
-      },
-    ],
-  },
-  {
-    id: "ord_04",
-    reference: "VL-502847",
-    customerName: "بشوشي إلياس",
-    phone: "0542372877",
-    wilaya: "16 - الجزائر",
-    commune: "الجزائر الوسطى",
-    address: "حيدرة شارع ديدوش",
-    status: "pending",
-    paymentMethod: "cod",
-    subtotal: 1750,
-    shipping: 500,
-    total: 2250,
-    offerTitle: "تيشرت 1750 دج",
-    createdAt: new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString(),
-    items: [
-      {
-        id: "oi_4",
-        productId: "p_old_money",
-        variantId: "p_old_money_L_111111",
-        name: { fr: "Old money", ar: "Old money" },
-        size: "L",
-        color: { fr: "Noir", ar: "أسود" },
-        image: "https://images.unsplash.com/photo-1581655353564-df123a1eb820?auto=format&fit=crop&w=1200&q=80",
-        unitPrice: 1750,
-        quantity: 1,
-      },
-    ],
-  },
-  {
-    id: "ord_05",
-    reference: "VL-491028",
-    customerName: "طاهر براهيمي",
-    phone: "0667454335",
-    wilaya: "03 - الأغواط",
-    commune: "الأغواط",
-    address: "حي المحطة",
-    status: "cancelled",
-    paymentMethod: "cod",
-    subtotal: 1750,
-    shipping: 500,
-    total: 2250,
-    offerTitle: "Old money تيشرت",
-    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    items: [
-      {
-        id: "oi_5",
-        productId: "p_old_money",
-        variantId: "p_old_money_XL_FFFFFF",
-        name: { fr: "Old money", ar: "Old money" },
-        size: "XL",
-        color: { fr: "Blanc", ar: "أبيض" },
-        image: "https://images.unsplash.com/photo-1581655353564-df123a1eb820?auto=format&fit=crop&w=1200&q=80",
-        unitPrice: 1750,
-        quantity: 1,
-      },
-    ],
-  },
-  {
-    id: "ord_06",
-    reference: "VL-381920",
-    customerName: "بن منصور أمير",
-    phone: "0792627815",
-    wilaya: "05 - باتنة",
-    commune: "باتنة",
-    address: "حي كشيدة",
-    status: "delivered",
-    paymentMethod: "cod",
-    subtotal: 3700,
-    shipping: 500,
-    total: 4200,
-    offerTitle: "بنطلون 2 قطع",
-    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-    items: [
-      {
-        id: "oi_6",
-        productId: "p_pantalon_lin",
-        variantId: "p_pantalon_lin_M_E8DCB8",
-        name: { fr: "Pontalon lin", ar: "بنطلون كتان صيفي" },
-        size: "M",
-        color: { fr: "Beige", ar: "بيج" },
-        image: "https://images.unsplash.com/photo-1473966968600-fa801b869a1a?auto=format&fit=crop&w=1200&q=80",
-        unitPrice: 3700,
-        quantity: 1,
-      },
-    ],
-  },
-  {
-    id: "ord_07",
-    reference: "VL-274819",
-    customerName: "بشرى",
-    phone: "0781337683",
-    wilaya: "38 - تسمسيلت",
-    commune: "تسمسيلت",
-    address: "حي النور",
-    status: "delivered",
-    paymentMethod: "cod",
-    subtotal: 3700,
-    shipping: 500,
-    total: 4200,
-    offerTitle: "عقد صيفي",
-    createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-    items: [
-      {
-        id: "oi_7",
-        productId: "p_robe_rope",
-        variantId: "p_robe_rope_Standard_FFB6C1",
-        name: { fr: "Rope", ar: "فستان روب عصري" },
-        size: "Standard",
-        color: { fr: "Rose", ar: "وردي" },
-        image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=80",
-        unitPrice: 3700,
-        quantity: 1,
-      },
-    ],
-  },
-  {
-    id: "ord_08",
-    reference: "VL-164728",
-    customerName: "abir",
-    phone: "0673276509",
-    wilaya: "30 - ورقلة",
-    commune: "ورقلة",
-    address: "حي سيدي عابد",
-    status: "delivered",
-    paymentMethod: "cod",
-    subtotal: 3600,
-    shipping: 600,
-    total: 4200,
-    offerTitle: "عرض خاص",
-    createdAt: new Date(Date.now() - 6.5 * 60 * 60 * 1000).toISOString(),
-    items: [
-      {
-        id: "oi_8",
-        productId: "p_robe_rope",
-        variantId: "p_robe_rope_Standard_FFB6C1",
-        name: { fr: "Rope", ar: "فستان روب عصري" },
-        size: "Standard",
-        color: { fr: "Rose", ar: "وردي" },
-        image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=80",
-        unitPrice: 3600,
-        quantity: 1,
-      },
-    ],
-  },
-  {
-    id: "ord_09",
-    reference: "VL-053629",
-    customerName: "ميمي",
-    phone: "0564877791",
-    wilaya: "16 - الجزائر",
-    commune: "باب الزوار",
-    address: "حي 5 جويلية",
-    status: "delivered",
-    paymentMethod: "cod",
-    subtotal: 3800,
-    shipping: 500,
-    total: 4300,
-    offerTitle: "روب صيفي",
-    createdAt: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(),
-    items: [
-      {
-        id: "oi_9",
-        productId: "p_robe_rope",
-        variantId: "p_robe_rope_Standard_FFB6C1",
-        name: { fr: "Rope", ar: "فستان روب عصري" },
-        size: "Standard",
-        color: { fr: "Rose", ar: "وردي" },
-        image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=80",
-        unitPrice: 3800,
-        quantity: 1,
-      },
-    ],
-  },
-];
+const initialOrders: Order[] = [];
 
 export function getStoredLandingImagesMap(): Record<string, string[]> {
   if (typeof window === "undefined") return {};
@@ -318,26 +56,28 @@ export function saveLandingImagesMap(productId: string, slug: string, landingIma
 }
 
 export function getStoredProducts(): Product[] {
-  if (typeof window === "undefined") return seedProducts;
+  if (typeof window === "undefined") return [];
   try {
     const landingMap = getStoredLandingImagesMap();
     const saved = localStorage.getItem("velora_products");
     if (saved) {
       const parsed = JSON.parse(saved) as Product[];
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((p) => ({
-          ...p,
-          landingImages:
-            p.landingImages && p.landingImages.length > 0
-              ? p.landingImages
-              : landingMap[p.id] || landingMap[p.slug] || [],
-        }));
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((p) => !p.id.startsWith("p_"))
+          .map((p) => ({
+            ...p,
+            landingImages:
+              p.landingImages && p.landingImages.length > 0
+                ? p.landingImages
+                : landingMap[p.id] || landingMap[p.slug] || [],
+          }));
       }
     }
   } catch {
     // ignore
   }
-  return seedProducts;
+  return [];
 }
 
 function getStoredOrders(): Order[] {
@@ -456,7 +196,7 @@ const sb = () => (isSupabaseConfigured() ? createClient() : null);
 
 export const useCatalogStore = create<CatalogState>()((set, get) => ({
   // Seed products available instantly so client & server render immediately with 0 delay
-  products: seedProducts,
+  products: [],
   categories: seedCategories,
   catalogLoadState: "ready",
   orders: initialOrders,
@@ -467,7 +207,7 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     if (typeof window === "undefined") return;
     const stored = getStoredProducts();
     set((state) => ({
-      products: stored.length ? stored : (state.products.length ? state.products : seedProducts),
+      products: stored.length ? stored : state.products,
       orders: state.orders.length ? state.orders : getStoredOrders(),
       abandonedCheckouts: state.abandonedCheckouts.length
         ? state.abandonedCheckouts

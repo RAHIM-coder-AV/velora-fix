@@ -34,12 +34,23 @@ export function normalizePixelSettings(value: unknown): PixelSettings {
   };
 }
 
-export function enabledMetaPixelIds(settings: PixelSettings): string[] {
+export function enabledMetaPixelIds(settings?: PixelSettings | null): string[] {
   const normalized = normalizePixelSettings(settings);
-  return normalized.metaPixelIds.filter((id, index) => id && normalized.metaPixelEnabled[index]);
+  const ids = normalized.metaPixelIds.filter((id, index) => id && normalized.metaPixelEnabled[index]);
+  const envId = typeof process !== "undefined" ? process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim() : undefined;
+  if (envId && isValidMetaPixelId(envId) && !ids.includes(envId)) {
+    ids.unshift(envId);
+  }
+  return ids;
 }
 
-export function enabledTikTokPixelIds(settings: PixelSettings): string[] {
+export function enabledTikTokPixelIds(settings?: PixelSettings | null): string[] {
   const normalized = normalizePixelSettings(settings);
-  return normalized.tiktokPixelIds.filter((id, index) => id && normalized.tiktokPixelEnabled[index]);
+  const ids = normalized.tiktokPixelIds.filter((id, index) => id && normalized.tiktokPixelEnabled[index]);
+  const envId = typeof process !== "undefined" ? process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID?.trim() : undefined;
+  if (envId && isValidTikTokPixelId(envId) && !ids.includes(envId)) {
+    ids.unshift(envId);
+  }
+  return ids;
 }
+
