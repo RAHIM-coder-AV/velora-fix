@@ -24,6 +24,7 @@ import {
 import type { Category, Localized, Product } from "@/types";
 import {
   createDefaultHomepageContent,
+  getVisibleStorefrontHomepageSections,
   productsForHomepageSection,
   type HomepageContent,
   type HomepageSection,
@@ -279,163 +280,114 @@ export function StoreHomepage({ locale }: StoreHomepageProps) {
         </div>
       </section>
 
-      {/* 4. Dynamic Sections: Categories, Featured, Editorial, New Arrivals */}
-      {homepage.sections
-        .filter((s) => s.id !== "hero")
-        .sort((a, b) => a.order - b.order)
-        .map((section) => {
-          if (!section.visible) return null;
+      {/* 4. Dynamic Sections: Categories, Editorial, New Arrivals */}
+      {getVisibleStorefrontHomepageSections(homepage).map((section) => {
+        // Category Universe Section
+        if (section.id === "categories") {
+          const available = new Set(categories.map((c) => c.slug));
+          const visibleCategories = section.items.filter((item) => available.has(item.slug));
+          return (
+            <section key={section.id} className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24">
+              <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-amber-700">
+                    {isAr ? "عوالم التشكيلات" : "UNIVERS & COLLECTIONS"}
+                  </span>
+                  <h2 className="mt-1 font-serif text-3xl font-semibold text-stone-950 sm:text-4xl">
+                    {text(section.title, locale)}
+                  </h2>
+                </div>
+                <Link
+                  href={`/${locale}/categories`}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-stone-900 hover:text-amber-700 transition"
+                >
+                  <span>{isAr ? "عرض جميع التصنيفات" : "Toutes les catégories"}</span>
+                  {isAr ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                </Link>
+              </div>
 
-          // Category Universe Section
-          if (section.id === "categories") {
-            const available = new Set(categories.map((c) => c.slug));
-            const visibleCategories = section.items.filter((item) => available.has(item.slug));
-            return (
-              <section key={section.id} className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24">
-                <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
+                {visibleCategories.map((category) => {
+                  const catProductsCount = products.filter((p) => p.categoryId.includes(category.slug)).length;
+                  return (
+                    <Link
+                      key={category.slug}
+                      href={localizedHref(category.href, locale)}
+                      className="group relative aspect-[3/4] overflow-hidden rounded-2xl bg-stone-200 shadow-md ring-1 ring-stone-900/5 transition duration-500 hover:-translate-y-1 hover:shadow-xl"
+                    >
+                      <HomepageImage
+                        src={category.imageUrl}
+                        alt={text(category.title, locale)}
+                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-stone-950/80 via-stone-950/20 to-transparent transition duration-300 group-hover:from-stone-950/90" />
+                      <div className="absolute inset-x-0 bottom-0 p-5 text-white">
+                        <span className="text-[10px] uppercase tracking-widest text-stone-300">
+                          {isAr ? "مجموعة" : "Collection"}
+                        </span>
+                        <h3 className="font-serif text-lg font-bold sm:text-xl">
+                          {text(category.title, locale)}
+                        </h3>
+                        <div className="mt-2 flex items-center justify-between text-xs text-stone-300 opacity-0 transform translate-y-2 transition duration-300 group-hover:opacity-100 group-hover:translate-y-0">
+                          <span>{isAr ? "اكتشف المجموعة" : "Explorer"}</span>
+                          {isAr ? <ArrowLeft size={14} /> : <ArrowRight size={14} />}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        }
+
+        // Editorial & Lookbook Story (Hidden as requested)
+        if (section.id === "editorial") {
+          return null;
+        }
+
+        // New Arrivals
+        if (section.id === "new-arrivals") {
+          const newProducts = productsForHomepageSection(section, products);
+          return (
+            <section key={section.id} className="border-t border-stone-200 bg-white py-16 sm:py-24">
+              <div className="mx-auto max-w-7xl px-5 sm:px-8">
+                <div className="mb-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                   <div>
                     <span className="text-xs font-bold uppercase tracking-[0.2em] text-amber-700">
-                      {isAr ? "عوالم التشكيلات" : "UNIVERS & COLLECTIONS"}
+                      {isAr ? "أحدث الإضافات" : "DERNIERS ARRIVAGES"}
                     </span>
                     <h2 className="mt-1 font-serif text-3xl font-semibold text-stone-950 sm:text-4xl">
                       {text(section.title, locale)}
                     </h2>
                   </div>
                   <Link
-                    href={`/${locale}/categories`}
+                    href={`/${locale}/products`}
                     className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-stone-900 hover:text-amber-700 transition"
                   >
-                    <span>{isAr ? "عرض جميع التصنيفات" : "Toutes les catégories"}</span>
+                    <span>{isAr ? "مشاهدة الكل" : "Tout voir"}</span>
                     {isAr ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
                   </Link>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
-                  {visibleCategories.map((category) => {
-                    const catProductsCount = products.filter((p) => p.categoryId.includes(category.slug)).length;
-                    return (
-                      <Link
-                        key={category.slug}
-                        href={localizedHref(category.href, locale)}
-                        className="group relative aspect-[3/4] overflow-hidden rounded-2xl bg-stone-200 shadow-md ring-1 ring-stone-900/5 transition duration-500 hover:-translate-y-1 hover:shadow-xl"
-                      >
-                        <HomepageImage
-                          src={category.imageUrl}
-                          alt={text(category.title, locale)}
-                          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-stone-950/80 via-stone-950/20 to-transparent transition duration-300 group-hover:from-stone-950/90" />
-                        <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-                          <span className="text-[10px] uppercase tracking-widest text-stone-300">
-                            {isAr ? "مجموعة" : "Collection"}
-                          </span>
-                          <h3 className="font-serif text-lg font-bold sm:text-xl">
-                            {text(category.title, locale)}
-                          </h3>
-                          <div className="mt-2 flex items-center justify-between text-xs text-stone-300 opacity-0 transform translate-y-2 transition duration-300 group-hover:opacity-100 group-hover:translate-y-0">
-                            <span>{isAr ? "اكتشف المجموعة" : "Explorer"}</span>
-                            {isAr ? <ArrowLeft size={14} /> : <ArrowRight size={14} />}
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </section>
-            );
-          }
-
-          // Featured Products / Best Sellers
-          if (section.id === "featured") {
-            const selectedProducts = productsForHomepageSection(section, products);
-            const displayProducts =
-              selectedProducts.length > 0
-                ? selectedProducts
-                : products.filter((p) => p.active !== false).slice(0, 8);
-            return (
-              <section key={section.id} className="border-t border-stone-200 bg-white py-16 sm:py-24">
-                <div className="mx-auto max-w-7xl px-5 sm:px-8">
-                  <div className="mb-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-                    <div>
-                      <span className="text-xs font-bold uppercase tracking-[0.2em] text-amber-700">
-                        {isAr ? "الأكثر تميزاً" : "SÉLECTION ICONIQUE"}
-                      </span>
-                      <h2 className="mt-1 font-serif text-3xl font-semibold text-stone-950 sm:text-4xl">
-                        {text(section.title, locale)}
-                      </h2>
-                    </div>
-                    <Link
-                      href={`/${locale}/products`}
-                      className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-stone-900 hover:text-amber-700 transition"
-                    >
-                      <span>{isAr ? "تصفح كل التشكيلة" : "Voir toute la collection"}</span>
-                      {isAr ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-                    </Link>
+                {newProducts.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
+                    {newProducts.map((product) => (
+                      <ProductCard key={product.id} product={product} />
+                    ))}
                   </div>
+                ) : (
+                  <p className="rounded-xl border border-stone-200 p-8 text-center text-sm text-stone-500">
+                    {isAr ? "لا توجد منتجات جديدة حالياً." : "Aucune nouveauté pour le moment."}
+                  </p>
+                )}
+              </div>
+            </section>
+          );
+        }
 
-                  {displayProducts.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
-                      {displayProducts.map((product) => (
-                        <ProductCard key={product.id} product={product} />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="rounded-xl border border-stone-200 p-8 text-center text-sm text-stone-500">
-                      {isAr ? "جاري تجهيز مختارات التشكيلة..." : "Aucun produit disponible pour le moment."}
-                    </p>
-                  )}
-                </div>
-              </section>
-            );
-          }
-
-          // Editorial & Lookbook Story (Hidden as requested)
-          if (section.id === "editorial") {
-            return null;
-          }
-
-          // New Arrivals
-          if (section.id === "new-arrivals") {
-            const newProducts = productsForHomepageSection(section, products);
-            return (
-              <section key={section.id} className="border-t border-stone-200 bg-white py-16 sm:py-24">
-                <div className="mx-auto max-w-7xl px-5 sm:px-8">
-                  <div className="mb-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-                    <div>
-                      <span className="text-xs font-bold uppercase tracking-[0.2em] text-amber-700">
-                        {isAr ? "أحدث الإضافات" : "DERNIERS ARRIVAGES"}
-                      </span>
-                      <h2 className="mt-1 font-serif text-3xl font-semibold text-stone-950 sm:text-4xl">
-                        {text(section.title, locale)}
-                      </h2>
-                    </div>
-                    <Link
-                      href={`/${locale}/products`}
-                      className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-stone-900 hover:text-amber-700 transition"
-                    >
-                      <span>{isAr ? "مشاهدة الكل" : "Tout voir"}</span>
-                      {isAr ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-                    </Link>
-                  </div>
-
-                  {newProducts.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
-                      {newProducts.map((product) => (
-                        <ProductCard key={product.id} product={product} />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="rounded-xl border border-stone-200 p-8 text-center text-sm text-stone-500">
-                      {isAr ? "لا توجد منتجات جديدة حالياً." : "Aucune nouveauté pour le moment."}
-                    </p>
-                  )}
-                </div>
-              </section>
-            );
-          }
-
-          return null;
-        })}
+        return null;
+      })}
 
       {/* 5. Customer Testimonials & Reviews Showcase */}
       <section className="border-t border-stone-200 bg-[#faf8f5] py-16 sm:py-24">

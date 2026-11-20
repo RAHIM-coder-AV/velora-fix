@@ -168,7 +168,7 @@ interface CatalogState {
   updateProductOffers: (productId: string, offers: ProductOffer[]) => void;
   addOrder: (order: Order) => void;
   updateOrder: (order: Order) => Promise<void>;
-  deleteOrder: (id: string) => void;
+  deleteOrder: (id: string) => Promise<void>;
   setOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
   bulkSetOrderStatus: (ids: string[], status: OrderStatus) => void;
   updateOrderDelivery: (
@@ -519,7 +519,11 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     set({ orders: updated });
     saveOrders(updated);
   },
-  deleteOrder: (id) => {
+  deleteOrder: async (id) => {
+    const client = sb();
+    if (client && UUID_RE.test(id)) {
+      await db.deleteOrder(client, id);
+    }
     const updated = get().orders.filter((o) => o.id !== id);
     set({ orders: updated });
     saveOrders(updated);

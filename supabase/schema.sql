@@ -188,6 +188,8 @@ create policy "own wishlist" on public.wishlists for all using (auth.uid() = use
 create policy "own orders" on public.orders for select using (auth.uid() = user_id or public.is_admin());
 create policy "insert orders" on public.orders for insert with check (true);
 create policy "admin update orders" on public.orders for update using (public.is_admin());
+create policy "admin delete orders" on public.orders for delete using (public.is_admin());
+grant delete on public.orders to authenticated;
 
 create policy "order items via order" on public.order_items for select using (
   exists (select 1 from public.orders o where o.id = order_id and (o.user_id = auth.uid() or public.is_admin()))

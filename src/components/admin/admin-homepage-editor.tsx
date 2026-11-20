@@ -472,7 +472,7 @@ export function AdminHomepageEditor({ products, categories }: AdminHomepageEdito
       <div className="mt-5">
         <p className="mb-2 text-sm font-semibold text-stone-800">إضافة قسم</p>
         <div className="flex flex-wrap gap-2">
-          {(["hero", "categories", "featured", "editorial", "new-arrivals"] as const)
+          {(["hero", "categories", "editorial", "new-arrivals"] as const)
             .filter((id) => !draft.sections.some((section) => section.id === id))
             .map((id) => (
               <button key={id} type="button" onClick={() => addSection(id)} className="min-h-10 rounded border border-stone-300 px-3 text-sm text-stone-800">

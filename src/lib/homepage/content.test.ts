@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   createDefaultHomepageContent,
+  getVisibleStorefrontHomepageSections,
   isHomepageContent,
   moveHomepageSection,
   productsForHomepageSection,
@@ -32,8 +33,28 @@ const product = (slug: string, options: Partial<Product> = {}): Product => ({
 test("default homepage contains editable ordered sections and a template", () => {
   const content = createDefaultHomepageContent();
   assert.equal(content.theme, "atelier");
-  assert.deepEqual(content.sections.map((section) => section.order), [0, 1, 2, 3, 4]);
+  assert.deepEqual(content.sections.map((section) => section.order), [0, 1, 2, 3]);
+  assert.deepEqual(
+    content.sections.map((section) => section.id),
+    ["hero", "categories", "editorial", "new-arrivals"],
+  );
   assert.ok(isHomepageContent(content));
+});
+
+test("storefront omits the featured section from legacy saved content", () => {
+  const content = createDefaultHomepageContent();
+  content.sections.push({
+    id: "featured",
+    visible: true,
+    order: 1,
+    title: { fr: "Pièces choisies", ar: "مختارات فيلورا" },
+    selectionMode: "automatic",
+    productSlugs: [],
+  });
+  assert.deepEqual(
+    getVisibleStorefrontHomepageSections(content).map((section) => section.id),
+    ["categories", "new-arrivals"],
+  );
 });
 
 test("curated product section follows chosen order and omits inactive or missing products", () => {
@@ -74,17 +95,23 @@ test("automatic sections use current product flags", () => {
 
 test("section reordering is bounded and normalizes order values", () => {
   const initial = createDefaultHomepageContent();
-  const moved = moveHomepageSection(initial, "featured", -1);
+  const moved = moveHomepageSection(initial, "categories", -1);
   assert.deepEqual(
     [...moved.sections].sort((a, b) => a.order - b.order).map((section) => section.id),
-    ["hero", "featured", "categories", "editorial", "new-arrivals"],
+    ["categories", "hero", "editorial", "new-arrivals"],
   );
-  assert.equal(moveHomepageSection(moved, "hero", -1), moved);
+  assert.equal(moveHomepageSection(moved, "categories", -1), moved);
 });
 
 test("curating and deselecting products preserves a deliberate empty selection", () => {
-  const section = createDefaultHomepageContent().sections.find((item) => item.id === "featured");
-  assert.ok(section && (section.id === "featured" || section.id === "new-arrivals"));
+  const section: HomepageProductSection = {
+    id: "featured",
+    visible: true,
+    order: 0,
+    title: { ar: "مختارات", fr: "Choix" },
+    selectionMode: "automatic",
+    productSlugs: [],
+  };
   const selected = updateHomepageProductSelection(section, "item", true);
   const deselected = updateHomepageProductSelection(selected, "item", false);
   assert.equal(deselected.selectionMode, "curated");

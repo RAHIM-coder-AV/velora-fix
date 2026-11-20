@@ -412,6 +412,21 @@ export async function fetchOrders(sb: SupabaseClient, opts: { all?: boolean } = 
   return ((data ?? []) as OrderRow[]).map(mapOrder);
 }
 
+export async function deleteOrder(sb: SupabaseClient, id: string): Promise<void> {
+  const { data, error } = await sb
+    .from("orders")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) {
+    throw new Error(
+      "La commande n'a pas été supprimée. Vérifiez les permissions administrateur et réessayez.",
+    );
+  }
+}
+
 export async function updateOrderStatus(sb: SupabaseClient, id: string, status: OrderStatus) {
   const { error } = await sb.from("orders").update({ status }).eq("id", id);
   if (error) throw error;
