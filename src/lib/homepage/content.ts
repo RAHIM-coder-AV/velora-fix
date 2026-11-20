@@ -104,17 +104,9 @@ export function createDefaultHomepageContent(
         })),
       },
       {
-        id: "featured",
-        visible: true,
-        order: 2,
-        title: local("Pièces choisies", "مختارات فيلورا"),
-        selectionMode: "automatic",
-        productSlugs: [],
-      },
-      {
         id: "editorial",
         visible: false,
-        order: 3,
+        order: 2,
         title: local("Fabriqué pour durer", "صُنع ليدوم"),
         body: local(
           "Nous choisissons des matières nobles et des coupes justes pour accompagner votre quotidien.",
@@ -130,13 +122,21 @@ export function createDefaultHomepageContent(
       {
         id: "new-arrivals",
         visible: true,
-        order: 4,
+        order: 3,
         title: local("Nouveautés", "وصل حديثاً"),
         selectionMode: "automatic",
         productSlugs: [],
       },
     ],
   };
+}
+
+export function getVisibleStorefrontHomepageSections(
+  content: HomepageContent,
+): HomepageSection[] {
+  return content.sections
+    .filter((section) => section.visible && section.id !== "featured" && section.id !== "hero")
+    .sort((a, b) => a.order - b.order);
 }
 
 const isLocalized = (value: unknown): value is Localized =>

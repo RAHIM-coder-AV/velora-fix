@@ -299,19 +299,17 @@ const mapOrder = (r: OrderRow): Order => ({
 
 // ---------- Catalog ----------
 export async function fetchCatalog(sb: SupabaseClient) {
-  const [cats, prods, imgs, vars, revs] = await Promise.all([
+  const [cats, prods, imgs, vars] = await Promise.all([
     sb.from("categories").select("*").order("created_at"),
     sb.from("products").select("*").order("created_at", { ascending: false }),
     sb.from("product_images").select("*").order("position"),
     sb.from("product_variants").select("*"),
-    sb.from("reviews").select("*"),
   ]);
 
   if (cats.error) throw cats.error;
   if (prods.error) throw prods.error;
   if (imgs.error) throw imgs.error;
   if (vars.error) throw vars.error;
-  if (revs.error) throw revs.error;
 
   const imagesByProduct = new Map<string, ImageRow[]>();
   for (const i of (imgs.data ?? []) as ImageRow[]) {
@@ -324,22 +322,19 @@ export async function fetchCatalog(sb: SupabaseClient) {
   }
 
   const products = ((prods.data ?? []) as ProductRow[]).map((p) => {
-    const product = mapProduct(p, imagesByProduct.get(p.id) ?? [], variantsByProduct.get(p.id) ?? []);
-    const productReviews = ((revs.data ?? []) as ReviewRow[]).filter((r) => r.product_id === p.id);
-    product.reviewCount = productReviews.length;
-    product.rating = productReviews.length
-      ? productReviews.reduce((s, r) => s + r.rating, 0) / productReviews.length
-      : 0;
-    return product;
+    return mapProduct(p, imagesByProduct.get(p.id) ?? [], variantsByProduct.get(p.id) ?? []);
   });
-
-  const reviews = ((revs.data ?? []) as ReviewRow[]).map(mapReview);
 
   return {
     categories: ((cats.data ?? []) as CategoryRow[]).map(mapCategory),
     products,
-    reviews,
   };
+}
+
+export async function fetchReviews(sb: SupabaseClient): Promise<Review[]> {
+  const { data, error } = await sb.from("reviews").select("*");
+  if (error) throw error;
+  return ((data ?? []) as ReviewRow[]).map(mapReview);
 }
 
 // ---------- Orders ----------
@@ -410,6 +405,21 @@ export async function fetchOrders(sb: SupabaseClient, opts: { all?: boolean } = 
   const { data, error } = await query;
   if (error) throw error;
   return ((data ?? []) as OrderRow[]).map(mapOrder);
+}
+
+export async function deleteOrder(sb: SupabaseClient, id: string): Promise<void> {
+  const { data, error } = await sb
+    .from("orders")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) {
+    throw new Error(
+      "La commande n'a pas été supprimée. Vérifiez les permissions administrateur et réessayez.",
+    );
+  }
 }
 
 export async function updateOrderStatus(sb: SupabaseClient, id: string, status: OrderStatus) {
