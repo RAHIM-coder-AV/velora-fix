@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { deleteOrder } from "@/lib/supabase/data";
+import { deleteOrder, fetchCatalog } from "@/lib/supabase/data";
 
 function clientWithDeleteResult(result: {
   data: { id: string } | null;
@@ -27,6 +27,35 @@ function clientWithDeleteResult(result: {
     },
   } as unknown as SupabaseClient;
 }
+
+function catalogClient(requestedTables: string[]): SupabaseClient {
+  function queryBuilder() {
+    const result = Promise.resolve({ data: [], error: null });
+    return {
+      select: queryBuilder,
+      order: queryBuilder,
+      then: result.then.bind(result),
+    };
+  }
+
+  return {
+    from(table: string) {
+      requestedTables.push(table);
+      return queryBuilder();
+    },
+  } as unknown as SupabaseClient;
+}
+
+test("catalog loading does not wait for reviews", async () => {
+  const requestedTables: string[] = [];
+  await fetchCatalog(catalogClient(requestedTables));
+  assert.deepEqual(requestedTables.sort(), [
+    "categories",
+    "product_images",
+    "product_variants",
+    "products",
+  ]);
+});
 
 test("deleteOrder succeeds only when the database returns the deleted order", async () => {
   await deleteOrder(clientWithDeleteResult({ data: { id: "order-id" }, error: null }), "order-id");

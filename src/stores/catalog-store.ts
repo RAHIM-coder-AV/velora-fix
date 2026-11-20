@@ -223,15 +223,39 @@ export const useCatalogStore = create<CatalogState>()((set, get) => ({
     }
     set({ catalogLoadState: "loading" });
     try {
-      const { categories, products, reviews } = await db.fetchCatalog(client);
+      const { categories, products } = await db.fetchCatalog(client);
       const finalProducts = mergeCatalogProducts(products, get().products);
       set((state) => ({
         categories: categories.length ? categories : state.categories,
         products: finalProducts,
-        reviews: reviews.length ? reviews : state.reviews,
         catalogLoadState: "ready",
       }));
       saveProducts(finalProducts);
+      void db.fetchReviews(client).then((reviews) => {
+        const reviewsByProduct = new Map<string, Review[]>();
+        for (const review of reviews) {
+          const productReviews = reviewsByProduct.get(review.productId) ?? [];
+          productReviews.push(review);
+          reviewsByProduct.set(review.productId, productReviews);
+        }
+        const updatedProducts = get().products.map((product) => {
+          const productReviews = reviewsByProduct.get(product.id) ?? [];
+          return {
+            ...product,
+            reviewCount: productReviews.length,
+            rating: productReviews.length
+              ? productReviews.reduce((sum, review) => sum + review.rating, 0) / productReviews.length
+              : 0,
+          };
+        });
+        set((state) => ({
+          products: updatedProducts,
+          reviews: reviews.length ? reviews : state.reviews,
+        }));
+        saveProducts(updatedProducts);
+      }).catch((error) => {
+        console.warn("Could not sync reviews with database:", error);
+      });
     } catch (error) {
       console.warn("Could not sync catalog with database, continuing with local store:", error);
       set((state) => ({
