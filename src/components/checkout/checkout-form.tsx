@@ -128,7 +128,7 @@ export function CheckoutForm() {
     ev.preventDefault();
     if (!validate() || submitting) return;
     setSubmitting(true);
-    const draftSessionId = await abandonedCheckout.saveBeforeSubmit().catch((error) => {
+    const draftPromise = abandonedCheckout.saveBeforeSubmit().catch((error) => {
       console.error("Failed to save checkout draft before order placement", error);
       return null;
     });
@@ -168,8 +168,10 @@ export function CheckoutForm() {
 
     if (isSupabaseConfigured()) {
       try {
-        order.reference = await placeOrderDb(createClient()!, order, draftSessionId ?? undefined);
-        await useCatalogStore.getState().refresh(); // تحديث المخزون المعروض
+        order.reference = await placeOrderDb(createClient()!, order);
+        void useCatalogStore.getState().refresh().catch((error) => {
+          console.warn("Order was placed, but the catalog could not be refreshed:", error);
+        });
       } catch (e) {
         const msg = String((e as { message?: string })?.message ?? e);
         if (msg.includes("OUT_OF_STOCK") || msg.includes("VARIANT_NOT_FOUND")) {
@@ -198,6 +200,11 @@ export function CheckoutForm() {
       );
     }
 
+    void draftPromise.then((sessionId) => {
+      if (sessionId) return abandonedCheckout.markCompleted(order.reference);
+    }).catch((error) => {
+      console.error("Failed to mark checkout draft as converted", error);
+    });
     addOrder(order);
     void sendTelegramOrderNotification(order, useSettingsStore.getState().settings.telegram);
     try {
@@ -216,11 +223,6 @@ export function CheckoutForm() {
         quantity: item.quantity,
       })),
     });
-    if (draftSessionId && !isSupabaseConfigured()) {
-      await abandonedCheckout.markCompleted(order.reference).catch((error) => {
-        console.error("Failed to mark checkout draft as converted", error);
-      });
-    }
     setSubmitting(false);
     clear();
     setPlaced(order.reference);

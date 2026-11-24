@@ -163,19 +163,14 @@ export function QuickOrderForm({
   const communes = useMemo(() => getCommunesForWilaya(wilaya), [wilaya]);
 
   // Button disable mode configured from admin settings
-  const isButtonDisabled = useMemo(() => {
-    if (submitting) return true;
-    const mode = storefront?.productForm?.buttonDisableMode || "never";
-    if (mode === "out_of_stock") {
-      return isCompletelyOutOfStock;
-    }
-    if (mode === "invalid_fields") {
-      const isNameValid = !storefront?.productForm?.nameRequired || customerName.trim().length > 0;
-      const isPhoneValid = !storefront?.productForm?.phoneRequired || isAlgerianPhone(phone);
-      return !isNameValid || !isPhoneValid || !wilaya;
-    }
-    return false; // "never"
-  }, [submitting, storefront?.productForm, isCompletelyOutOfStock, customerName, phone, wilaya]);
+  const productFormSettings = storefront?.productForm;
+  const isButtonDisabled =
+    submitting ||
+    (productFormSettings?.buttonDisableMode === "out_of_stock" && isCompletelyOutOfStock) ||
+    (productFormSettings?.buttonDisableMode === "invalid_fields" &&
+      ((productFormSettings.nameRequired && !customerName.trim()) ||
+        (productFormSettings.phoneRequired && !isAlgerianPhone(phone)) ||
+        !wilaya));
 
   const currentPrice = selectedOffer ? selectedOffer.price : product.price;
   const selectedVariant = product.variants.find(
@@ -335,11 +330,7 @@ export function QuickOrderForm({
       const draftPromise = abandonedCheckout.saveBeforeSubmit().catch(() => null);
 
       if (isSupabaseConfigured()) {
-        const draftSessionId = await Promise.race([
-          draftPromise,
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 300)),
-        ]);
-        const serverRef = await placeOrderDb(createClient()!, newOrder, draftSessionId ?? undefined);
+        const serverRef = await placeOrderDb(createClient()!, newOrder);
         if (serverRef) newOrder.reference = serverRef;
         // Run refresh in background without delaying user
         void useCatalogStore.getState().refresh().catch(() => {});
@@ -347,6 +338,11 @@ export function QuickOrderForm({
         void setVariantStock(product.id, activeVariant.id, Math.max(0, activeVariant.stock - qty));
       }
 
+      void draftPromise.then((sessionId) => {
+        if (sessionId) return abandonedCheckout.markCompleted(newOrder.reference);
+      }).catch((error) => {
+        console.error("Failed to mark checkout draft as converted", error);
+      });
       addOrder(newOrder);
       void sendTelegramOrderNotification(newOrder, useSettingsStore.getState().settings.telegram);
       try {

@@ -470,7 +470,19 @@ export default function AdminPage() {
             <AdminOrdersTable
               orders={orders}
               onStatusChange={(id, status) => void setOrderStatus(id, status)}
-              onDeleteOrder={(id) => deleteOrder(id)}
+              onDeleteOrder={async (id) => {
+                try {
+                  await deleteOrder(id);
+                  toast(locale === "ar" ? "تم حذف الطلب بنجاح." : "Commande supprimée.");
+                } catch (error) {
+                  console.error("Could not delete order.", error);
+                  toast(
+                    locale === "ar"
+                      ? `تعذر حذف الطلب. لم تتغير البيانات المحفوظة. ${errorMessage(error)}`
+                      : `Impossible de supprimer la commande. Aucune donnée n'a été modifiée. ${errorMessage(error)}`,
+                  );
+                }
+              }}
             />
           </div>
         )}
